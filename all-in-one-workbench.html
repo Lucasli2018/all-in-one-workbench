@@ -169,7 +169,7 @@
   <!-- 记账 -->
   <section class="sec active" id="sec-account">
     <div class="card">
-      <div class="card-h"><h3>📊 本月概览</h3><span class="sub" id="accMonth"></span></div>
+      <div class="card-h"><h3>📊 本月概览</h3><span class="sub" id="accMonth"></span><button class="ic-btn" id="accEditBudget" style="min-height:34px;padding:5px 12px;">预算</button></div>
       <div class="chart-row">
         <div id="budgetRing"></div>
         <div id="pieChart" style="flex:1;min-width:160px;"></div>
@@ -625,6 +625,7 @@ function bindEvents(){
   fillCatOptions("expense");
   document.getElementById("accDate").value=todayStr();
   document.getElementById("accAdd").addEventListener("click",addAccount);
+  document.getElementById("accEditBudget").addEventListener("click",editBudget);
   // 习惯
   document.getElementById("habitAdd").addEventListener("click",openHabitModal);
   document.getElementById("habitList").addEventListener("click",e=>{
@@ -670,6 +671,18 @@ function addAccount(){
   state.accounts.push({id:uid(),type,amount,cat,date,note});
   save();refreshAll();
   document.getElementById("accAmount").value="";document.getElementById("accNote").value="";
+}
+function editBudget(){
+  document.getElementById("modalBox").innerHTML=`
+    <h3>设置月度预算</h3>
+    <div class="field"><label>预算金额 (¥)</label><input type="number" id="mBudget" value="${state.budget}" min="0" step="100"></div>
+    <button class="btn-primary" id="mBudgetSave">保存</button>`;
+  document.getElementById("mBudgetSave").addEventListener("click",()=>{
+    const v=parseFloat(document.getElementById("mBudget").value);
+    if(!(v>=0)){alert("请输入有效金额");return;}
+    state.budget=v;save();refreshAll();closeModal();
+  });
+  openModal();
 }
 function addTodo(){
   const title=document.getElementById("todoTitle").value.trim();

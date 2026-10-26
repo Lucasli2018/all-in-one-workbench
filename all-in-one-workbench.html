@@ -112,6 +112,8 @@
   /* Toolbar */
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
   .toolbar .ic-btn{flex:1;min-width:120px;}
+  .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .filter-bar select,.filter-bar input{flex:1;min-width:110px;}
   .warn{background:#FFF6E5;border:1px solid #FFE2A8;color:#B5760A;font-size:13px;padding:10px 12px;border-radius:11px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
   .banner-top{background:#FFF1EE;border:1px solid #FFD3C7;color:var(--coral-d);font-size:13px;padding:9px 14px;margin:10px auto 0;max-width:880px;border-radius:11px;text-align:center;}
   /* Modal */
@@ -197,6 +199,11 @@
     </div>
     <div class="card">
       <div class="card-h"><h3>📜 最近记录</h3><span class="sub" id="accTotal"></span></div>
+      <div class="filter-bar" id="accFilterBar">
+        <select id="accFMonth"><option value="">全部分月</option></select>
+        <select id="accFCat"><option value="">全部分类</option></select>
+        <input type="text" id="accFKey" placeholder="搜索备注/分类">
+      </div>
       <div class="list" id="accList"></div>
     </div>
   </section>
@@ -425,12 +432,24 @@ function renderAccounting(){
   list.filter(a=>a.type==="expense").forEach(a=>{byCat[a.category]=(byCat[a.category]||0)+a.amount;});
   const entries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
   document.getElementById("pieChart").innerHTML=entries.length?pie(entries):'<div class="empty">本月暂无支出</div>';
-  // 列表
-  const sorted=state.accounts.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,12);
+  // 列表（支持按月份/分类/关键字筛选）
+  const fMonth=document.getElementById("accFMonth"),fCat=document.getElementById("accFCat"),fKey=document.getElementById("accFKey");
+  const curMonth=fMonth.value||"",curCat=fCat.value||"",curKey=fKey.value.trim().toLowerCase();
+  const months=[...new Set(state.accounts.map(a=>monthOf(a.date)))].sort().reverse();
+  if(!months.includes(m)) months.unshift(m);
+  fMonth.innerHTML=['<option value="">全部分月</option>'].concat(months.map(mm=>`<option value="${mm}">${mm.replace("-","年")}月</option>`)).join("");
+  const cats=CAT_EXPENSE.concat(CAT_INCOME).map(c=>c[0]);
+  fCat.innerHTML=['<option value="">全部分类</option>'].concat(cats.map(c=>`<option value="${c}">${c}</option>`)).join("");
+  fMonth.value=curMonth; fCat.value=curCat; fKey.value=curKey;
+  const filtered=state.accounts.filter(a=>
+    (!curMonth||monthOf(a.date)===curMonth) &&
+    (!curCat||a.category===curCat) &&
+    (!curKey||(a.note||"").toLowerCase().includes(curKey)||a.category.toLowerCase().includes(curKey))
+  ).sort((a,b)=>a.date<b.date?1:-1).slice(0,80);
   const box=document.getElementById("accList");
-  document.getElementById("accTotal").textContent="共 "+state.accounts.length+" 条";
-  if(sorted.length===0){box.innerHTML='<div class="empty">还没有记录，快记一笔吧～</div>';return;}
-  box.innerHTML=sorted.map(a=>`
+  document.getElementById("accTotal").textContent="共 "+state.accounts.length+" 条"+(filtered.length!==state.accounts.length?"（已筛选 "+filtered.length+"）":"");
+  if(filtered.length===0){box.innerHTML='<div class="empty">没有符合条件的记录</div>';return;}
+  box.innerHTML=filtered.map(a=>`
     <div class="item">
       <div class="body">
         <div class="t1"><span class="cat-dot" style="background:${catColor(a.type,a.category)}"></span>${esc(a.category)} ${a.note?'· '+esc(a.note):''}</div>
@@ -630,6 +649,9 @@ function bindEvents(){
   document.getElementById("accDate").value=todayStr();
   document.getElementById("accAdd").addEventListener("click",addAccount);
   document.getElementById("accEditBudget").addEventListener("click",editBudget);
+  document.getElementById("accFMonth").addEventListener("change",renderAccounting);
+  document.getElementById("accFCat").addEventListener("change",renderAccounting);
+  document.getElementById("accFKey").addEventListener("input",renderAccounting);
   // 习惯
   document.getElementById("habitAdd").addEventListener("click",openHabitModal);
   document.getElementById("habitList").addEventListener("click",e=>{

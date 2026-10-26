@@ -436,6 +436,7 @@ function renderAccounting(){
         <div class="t1"><span class="cat-dot" style="background:${catColor(a.type,a.category)}"></span>${esc(a.category)} ${a.note?'· '+esc(a.note):''}</div>
         <div class="t2"><span>${a.date}</span><span class="${a.type==='income'?'amt-in':'amt-out'}">${a.type==='income'?'+':'-'}¥${fmt(a.amount)}</span></div>
       </div>
+      <button class="del" data-edit="acc" data-id="${a.id}" title="编辑">✎</button>
       <button class="del" data-del="acc" data-id="${a.id}">✕</button>
     </div>`).join("");
 }
@@ -470,6 +471,7 @@ function renderHabits(){
       <div class="name">${esc(h.name)}</div>
       <div class="streak">🔥 连续 <b class="fire">${streak}</b> 天</div>
       <button class="ic-btn" data-habit="${h.id}" style="${doneToday?'background:var(--coral);color:#fff;':''}">${doneToday?'已打卡':'打卡'}</button>
+      <button class="del" data-edit="habit" data-id="${h.id}" title="编辑">✎</button>
       <button class="del" data-del="habit" data-id="${h.id}">✕</button>
     </div>`;
   }).join("");
@@ -508,6 +510,7 @@ function renderTodos(){
         <div class="t1">${esc(x.title)}</div>
         <div class="t2"><span class="pill p-${x.priority}">${x.priority}</span><span style="${overdue?'color:var(--red);':''}">${x.date}${overdue?' · 逾期':''}</span></div>
       </div>
+      <button class="del" data-edit="todo" data-id="${x.id}" title="编辑">✎</button>
       <button class="del" data-del="todo" data-id="${x.id}">✕</button>
     </div>`;
   }).join("");
@@ -526,6 +529,7 @@ function renderFitness(){
         <div class="t1">⚖️ ${f.weight} kg ${f.fat?('· 体脂 '+f.fat+'%'):''}</div>
         <div class="t2"><span>${f.date}</span>${f.note?'<span>'+esc(f.note)+'</span>':''}</div>
       </div>
+      <button class="del" data-edit="fit" data-id="${f.id}" title="编辑">✎</button>
       <button class="del" data-del="fit" data-id="${f.id}">✕</button>
     </div>`).join("");
 }
@@ -630,6 +634,7 @@ function bindEvents(){
   document.getElementById("habitAdd").addEventListener("click",openHabitModal);
   document.getElementById("habitList").addEventListener("click",e=>{
     const b=e.target.closest("[data-habit]"); if(b){const h=state.habits.find(z=>z.id===b.dataset.habit);if(h){h.records[todayStr()]=!h.records[todayStr()];save();refreshAll();}return;}
+    const ed=e.target.closest("[data-edit='habit']"); if(ed){editHabit(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='habit']"); if(d){state.habits=state.habits.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
   // 待办
@@ -637,16 +642,19 @@ function bindEvents(){
   document.getElementById("todoAdd").addEventListener("click",addTodo);
   document.getElementById("todoList").addEventListener("click",e=>{
     const c=e.target.closest("[data-chk]"); if(c){const x=state.todos.find(z=>z.id===c.dataset.chk);if(x){x.done=!x.done;save();refreshAll();}return;}
+    const ed=e.target.closest("[data-edit='todo']"); if(ed){editTodo(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='todo']"); if(d){state.todos=state.todos.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
   // 减脂
   document.getElementById("fitDate").value=todayStr();
   document.getElementById("fitAdd").addEventListener("click",addFitness);
   document.getElementById("fitList").addEventListener("click",e=>{
+    const ed=e.target.closest("[data-edit='fit']"); if(ed){editFitness(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='fit']"); if(d){state.fitness=state.fitness.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
   // 删除记账（事件委托到 accList）
   document.getElementById("accList").addEventListener("click",e=>{
+    const ed=e.target.closest("[data-edit='acc']"); if(ed){editAccount(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='acc']"); if(d){state.accounts=state.accounts.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
   // 备份
@@ -705,6 +713,90 @@ function addFitness(){
   else state.fitness.push({id:uid(),date,weight,fat,note});
   save();refreshAll();
   document.getElementById("fitWeight").value="";document.getElementById("fitFat").value="";document.getElementById("fitNote").value="";
+}
+function editTodo(id){
+  const x=state.todos.find(z=>z.id===id);if(!x)return;
+  document.getElementById("modalBox").innerHTML=`
+    <h3>编辑待办</h3>
+    <div class="field"><label>事项</label><input type="text" id="mTodoTitle" value="${esc(x.title)}"></div>
+    <div class="row">
+      <div class="field"><label>日期</label><input type="date" id="mTodoDate" value="${x.date}"></div>
+      <div class="field"><label>优先级</label><select id="mTodoPri">${["P0","P1","P2"].map(p=>`<option value="${p}" ${p===x.priority?"selected":""}>${p}</option>`).join("")}</select></div>
+    </div>
+    <button class="btn-primary" id="mTodoSave">保存</button>`;
+  document.getElementById("mTodoSave").addEventListener("click",()=>{
+    const title=document.getElementById("mTodoTitle").value.trim();
+    if(!title){alert("请输入事项");return;}
+    x.title=title;x.date=document.getElementById("mTodoDate").value||x.date;
+    x.priority=document.getElementById("mTodoPri").value;
+    save();refreshAll();closeModal();
+  });
+  openModal();
+}
+function editAccount(id){
+  const a=state.accounts.find(z=>z.id===id);if(!a)return;
+  document.getElementById("modalBox").innerHTML=`
+    <h3>编辑记录</h3>
+    <div class="seg" id="mAccType">
+      <button data-v="expense" ${a.type==="expense"?'class="on"':""}>支出</button>
+      <button data-v="income" ${a.type==="income"?'class="on"':""}>收入</button>
+    </div>
+    <div class="row" style="margin-top:11px;">
+      <div class="field"><label>金额 (¥)</label><input type="number" id="mAccAmount" value="${a.amount}" min="0" step="0.01"></div>
+      <div class="field"><label>分类</label><select id="mAccCat"></select></div>
+    </div>
+    <div class="field"><label>日期</label><input type="date" id="mAccDate" value="${a.date}"></div>
+    <div class="field"><label>备注</label><input type="text" id="mAccNote" value="${esc(a.note||"")}"></div>
+    <button class="btn-primary" id="mAccSave">保存</button>`;
+  let mtype=a.type;
+  const mfill=()=>{const arr=mtype==="income"?CAT_INCOME:CAT_EXPENSE;document.getElementById("mAccCat").innerHTML=arr.map(c=>`<option value="${c[0]}" ${c[0]===a.category?"selected":""}>${c[0]}</option>`).join("");};
+  document.querySelectorAll("#mAccType button").forEach(b=>b.addEventListener("click",()=>{mtype=b.dataset.v;document.querySelectorAll("#mAccType button").forEach(x=>x.classList.toggle("on",x===b));mfill();}));
+  mfill();
+  document.getElementById("mAccSave").addEventListener("click",()=>{
+    const amount=parseFloat(document.getElementById("mAccAmount").value);
+    if(!(amount>0)){alert("请输入有效金额");return;}
+    a.type=mtype;a.amount=amount;a.category=document.getElementById("mAccCat").value;
+    a.date=document.getElementById("mAccDate").value||a.date;a.note=document.getElementById("mAccNote").value.trim();
+    save();refreshAll();closeModal();
+  });
+  openModal();
+}
+function editFitness(id){
+  const f=state.fitness.find(z=>z.id===id);if(!f)return;
+  document.getElementById("modalBox").innerHTML=`
+    <h3>编辑记录</h3>
+    <div class="row">
+      <div class="field"><label>体重 (kg)</label><input type="number" id="mFitW" value="${f.weight}" min="0" step="0.1"></div>
+      <div class="field"><label>体脂 (%)</label><input type="number" id="mFitF" value="${f.fat!=null?f.fat:""}" min="0" step="0.1"></div>
+    </div>
+    <div class="field"><label>日期</label><input type="date" id="mFitD" value="${f.date}"></div>
+    <div class="field"><label>运动 / 备注</label><input type="text" id="mFitN" value="${esc(f.note||"")}"></div>
+    <button class="btn-primary" id="mFitSave">保存</button>`;
+  document.getElementById("mFitSave").addEventListener("click",()=>{
+    const w=parseFloat(document.getElementById("mFitW").value);
+    if(!(w>0)){alert("请输入体重");return;}
+    const fr=document.getElementById("mFitF").value;
+    f.weight=w;f.fat=fr===""?null:parseFloat(fr);
+    f.date=document.getElementById("mFitD").value||f.date;f.note=document.getElementById("mFitN").value.trim();
+    save();refreshAll();closeModal();
+  });
+  openModal();
+}
+function editHabit(id){
+  const h=state.habits.find(z=>z.id===id);if(!h)return;
+  let sel=h.color;
+  document.getElementById("modalBox").innerHTML=`
+    <h3>编辑习惯</h3>
+    <div class="field"><label>习惯名称</label><input type="text" id="mHN" value="${esc(h.name)}"></div>
+    <div class="field"><label>颜色</label><div id="mHR" style="display:flex;gap:8px;flex-wrap:wrap;"></div></div>
+    <button class="btn-primary" id="mHS">保存</button>`;
+  document.getElementById("mHR").innerHTML=HABIT_COLORS.map(c=>`<div data-c="${c}" style="width:34px;height:34px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===sel?"#fff":"transparent"};box-shadow:0 0 0 1px #ddd;"></div>`).join("");
+  document.querySelectorAll("#mHR div").forEach(d=>d.addEventListener("click",()=>{sel=d.dataset.c;document.querySelectorAll("#mHR div").forEach(x=>x.style.borderColor=x.dataset.c===sel?"#fff":"transparent");}));
+  document.getElementById("mHS").addEventListener("click",()=>{
+    const name=document.getElementById("mHN").value.trim();if(!name){alert("请输入名称");return;}
+    h.name=name;h.color=sel;save();refreshAll();closeModal();
+  });
+  openModal();
 }
 function openHabitModal(){
   const used=state.habits.length;

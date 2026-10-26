@@ -276,6 +276,7 @@
     <div class="card-h"><h3>💾 数据备份</h3></div>
     <div class="toolbar">
       <button class="ic-btn" id="btnExport">导出 JSON 备份</button>
+      <button class="ic-btn" id="btnExportCSV">导出 CSV</button>
       <button class="ic-btn" id="btnImport">导入恢复</button>
       <button class="ic-btn" id="btnClearSample">清空示例数据</button>
     </div>
@@ -702,6 +703,7 @@ function bindEvents(){
   });
   // 备份
   document.getElementById("btnExport").addEventListener("click",exportJSON);
+  document.getElementById("btnExportCSV").addEventListener("click",exportCSV);
   document.getElementById("btnImport").addEventListener("click",()=>document.getElementById("fileInput").click());
   document.getElementById("fileInput").addEventListener("change",importJSON);
   document.getElementById("btnClearSample").addEventListener("click",clearSample);
@@ -882,6 +884,14 @@ function exportJSON(){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="全能工作台备份_"+todayStr()+".json";a.click();
+  URL.revokeObjectURL(a.href);
+}
+function exportCSV(){
+  const rows=[["日期","类型","分类","金额","备注"]];
+  state.accounts.slice().sort((a,b)=>a.date<b.date?1:-1).forEach(a=>rows.push([a.date,a.type==="income"?"收入":"支出",a.category,a.amount,a.note||""]));
+  const csv=rows.map(r=>r.map(c=>{c=String(c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(",")).join("\n");
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="全能工作台记账_"+todayStr()+".csv";a.click();
   URL.revokeObjectURL(a.href);
 }
 function importJSON(e){

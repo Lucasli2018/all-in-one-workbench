@@ -129,17 +129,70 @@
   .bottom-nav button{flex:1;border:none;background:transparent;color:var(--sub);font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0;min-height:44px;justify-content:center;}
   .bottom-nav button svg{width:22px;height:22px;}
   .bottom-nav button.active{color:var(--coral-d);}
+  /* 背景装饰层（为毛玻璃提供透出质感） */
+  .bg-deco{position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+    radial-gradient(480px 480px at 6% 14%, rgba(255,122,89,.20), transparent 62%),
+    radial-gradient(480px 480px at 1% 95%, rgba(91,141,239,.15), transparent 62%);}
+  /* 左侧毛玻璃抽屉导航 */
+  .drawer{position:fixed;top:0;left:0;bottom:0;width:var(--drawer-w);z-index:25;display:none;
+    flex-direction:column;padding:22px 14px;
+    background:rgba(255,255,255,.72);backdrop-filter:blur(18px) saturate(160%);
+    -webkit-backdrop-filter:blur(18px) saturate(160%);
+    border-right:1px solid rgba(255,255,255,.6);box-shadow:2px 0 22px rgba(40,40,60,.07);}
+  .drawer-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;color:var(--coral-d);padding:4px 8px 20px;}
+  .drawer-logo svg{width:28px;height:28px;}
+  .drawer-nav{display:flex;flex-direction:column;gap:7px;}
+  .drawer-item{display:flex;align-items:center;gap:13px;padding:13px 15px;border:none;background:transparent;
+    color:var(--sub);font-size:15px;font-weight:600;border-radius:13px;cursor:pointer;text-align:left;
+    transition:.15s;font-family:inherit;}
+  .drawer-item svg{width:21px;height:21px;flex:0 0 auto;stroke:currentColor;}
+  .drawer-item:hover{background:rgba(255,122,89,.10);color:var(--coral-d);}
+  .drawer-item.active{background:linear-gradient(135deg,var(--coral),#FF9A6B);color:#fff;box-shadow:0 8px 18px rgba(255,122,89,.32);}
+  .drawer-foot{margin-top:auto;font-size:12px;color:var(--sub);line-height:1.6;padding:14px 8px 2px;border-top:1px solid rgba(0,0,0,.06);}
+  /* 底部导航激活态强化 */
+  .bottom-nav button{position:relative;}
+  .bottom-nav button.active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:24px;height:3px;border-radius:0 0 3px 3px;background:var(--coral);}
+  /* 顶部 tabs 在新导航体系下统一隐藏（桌面用抽屉、手机用底部导航） */
+  .tabs{display:none;}
+  /* 默认（移动优先）：显示 header + 底部导航，隐藏抽屉 */
   @media(min-width:760px){
+    .drawer{display:flex;}
     .bottom-nav{display:none;}
+    header{display:none;}
+    .wrap{margin-left:var(--drawer-w);}
     body{padding-bottom:18px;}
-    .tabs{position:sticky;top:0;}
-  }
-  @media(max-width:759px){
-    .tabs{display:none;}
   }
 </style>
 </head>
 <body>
+<div class="bg-deco"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-logo">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="#FF7A59" stroke-width="2.2" stroke-linecap="round"/><circle cx="18" cy="15" r="3.2" stroke="#FF7A59" stroke-width="2.2"/></svg>
+    全能工作台
+  </div>
+  <nav class="drawer-nav">
+    <button class="drawer-item active" data-tab="account">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9 12h6M12 9v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      记账
+    </button>
+    <button class="drawer-item" data-tab="habit">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      习惯
+    </button>
+    <button class="drawer-item" data-tab="todo">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      待办
+    </button>
+    <button class="drawer-item" data-tab="fit">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M6 12l3-6 3 4 3-8 3 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      减脂
+    </button>
+  </nav>
+  <div class="drawer-foot">本地存储 · 隐私无忧<br>数据仅存于本机浏览器</div>
+</aside>
+
 <header>
   <div class="head-row">
     <div class="logo">
@@ -651,12 +704,13 @@ function showTab(name){
   document.getElementById("sec-"+name).classList.add("active");
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
   document.querySelectorAll("#bottomNav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));
+  document.querySelectorAll(".drawer-item").forEach(d=>d.classList.toggle("active",d.dataset.tab===name));
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
 function bindEvents(){
   // tab
-  document.querySelectorAll(".tab,#bottomNav button").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
+  document.querySelectorAll(".tab,#bottomNav button,.drawer-item").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   // 今天要处理 完成
   document.getElementById("todayList").addEventListener("click",e=>{
     const btn=e.target.closest(".t-btn"); if(btn) handleToday(btn.dataset.act,btn.dataset.id);

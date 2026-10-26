@@ -163,6 +163,14 @@
     .wrap{margin-left:var(--drawer-w);}
     body{padding-bottom:18px;}
   }
+  /* 小屏适配：收紧间距，保证底部导航触控舒适 */
+  @media(max-width:480px){
+    .wrap{padding:0 10px;}
+    .card{padding:14px;margin-bottom:12px;}
+    .bottom-nav button{font-size:10px;}
+    .bottom-nav button svg{width:20px;height:20px;}
+    .stats{gap:8px;}
+  }
 </style>
 </head>
 <body>

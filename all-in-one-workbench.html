@@ -477,7 +477,7 @@ function renderHabits(){
     let bg="var(--line)",col="#fff";
     if(cnt>0){ if(cnt>=state.habits.length){bg="var(--coral)";} else if(cnt>=2){bg="#FFB199";} else {bg="#FFD9CC";} }
     const isT=ds===t;
-    cells+=`<div class="day" style="background:${bg};${isT?'outline:2px solid var(--coral-d);outline-offset:1px;':''}">${d}</div>`;
+    cells+=`<div class="day" data-date="${ds}" style="cursor:pointer;background:${bg};${isT?'outline:2px solid var(--coral-d);outline-offset:1px;':''}">${d}</div>`;
   }
   document.getElementById("habitCal").innerHTML=cells;
   // 习惯列表
@@ -494,6 +494,24 @@ function renderHabits(){
       <button class="del" data-del="habit" data-id="${h.id}">✕</button>
     </div>`;
   }).join("");
+}
+function openDayModal(date){
+  const items=state.habits.map(h=>`<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;">
+    <input type="checkbox" data-h="${h.id}" ${h.records[date]?'checked':''} style="width:18px;height:18px;flex:0 0 auto;">
+    <span style="font-weight:600;">${esc(h.name)}</span>
+  </label>`).join("");
+  document.getElementById("modalBox").innerHTML=`
+    <h3>${date} 打卡</h3>
+    ${state.habits.length?`<div style="display:flex;flex-direction:column;gap:8px;">${items}</div>`:'<div class="empty">还没有习惯，先去新增一个吧</div>'}
+    <button class="btn-primary" id="mDaySave" style="margin-top:12px;">完成</button>`;
+  document.getElementById("mDaySave").addEventListener("click",()=>{
+    document.querySelectorAll("#modalBox input[type=checkbox]").forEach(cb=>{
+      const h=state.habits.find(z=>z.id===cb.dataset.h);if(!h)return;
+      if(cb.checked)h.records[date]=true;else delete h.records[date];
+    });
+    save();refreshAll();closeModal();
+  });
+  openModal();
 }
 function calcStreak(records){
   let s=0;let d=todayStr();
@@ -654,6 +672,9 @@ function bindEvents(){
   document.getElementById("accFKey").addEventListener("input",renderAccounting);
   // 习惯
   document.getElementById("habitAdd").addEventListener("click",openHabitModal);
+  document.getElementById("habitCal").addEventListener("click",e=>{
+    const d=e.target.closest("[data-date]"); if(d) openDayModal(d.dataset.date);
+  });
   document.getElementById("habitList").addEventListener("click",e=>{
     const b=e.target.closest("[data-habit]"); if(b){const h=state.habits.find(z=>z.id===b.dataset.habit);if(h){h.records[todayStr()]=!h.records[todayStr()];save();refreshAll();}return;}
     const ed=e.target.closest("[data-edit='habit']"); if(ed){editHabit(ed.dataset.id);return;}

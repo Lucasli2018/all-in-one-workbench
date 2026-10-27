@@ -458,6 +458,7 @@
       <button class="db-btn" id="btnExport">导出 JSON 备份</button>
       <button class="db-btn" id="btnExportCSV">导出 CSV</button>
       <button class="db-btn" id="btnImport">导入恢复</button>
+      <button class="db-btn" id="btnSnap">📸 本地快照</button>
       <button class="db-btn danger" id="btnClearSample">清空示例数据</button>
     </div>
     <input type="file" id="fileInput" accept="application/json" style="display:none">
@@ -623,7 +624,7 @@
 <script>
 /* ============ 数据层 ============ */
 const PREFIX="wb_allin_";
-const KEYS={todos:PREFIX+"todos",accounts:PREFIX+"accounts",habits:PREFIX+"habits",fitness:PREFIX+"fitness",budget:PREFIX+"budget",seeded:PREFIX+"seeded",templates:PREFIX+"templates"};
+const KEYS={todos:PREFIX+"todos",accounts:PREFIX+"accounts",habits:PREFIX+"habits",fitness:PREFIX+"fitness",budget:PREFIX+"budget",seeded:PREFIX+"seeded",templates:PREFIX+"templates",snapshots:PREFIX+"snapshots"};
 const CAT_EXPENSE=[["餐饮","#FF7A59"],["交通","#5B8DEF"],["购物","#9B6DFF"],["居住","#27AE60"],["娱乐","#F2B705"],["医疗","#E8453C"],["其他","#8A8A95"]];
 const CAT_INCOME=[["工资","#27AE60"],["兼职","#5B8DEF"],["理财","#9B6DFF"],["红包","#FF7A59"],["其他","#8A8A95"]];
 const HABIT_COLORS=["#FF7A59","#5B8DEF","#27AE60","#9B6DFF","#F2B705","#E8453C"];
@@ -638,7 +639,22 @@ function loadAll(){
     state.templates=JSON.parse(localStorage.getItem(KEYS.templates)||"[]");
     const b=localStorage.getItem(KEYS.budget); if(b!==null) state.budget=Number(b);
     state.seeded=localStorage.getItem(KEYS.seeded)==="1";
+    migrateLegacy();
   }catch(e){ console.warn("load err",e); }
+}
+// 旧版本数据迁移：accounts 曾用 cat 字段存分类（导致列表/统计/编辑丢失分类），统一归一到 category
+function migrateLegacy(){
+  let fixed=0;
+  (state.accounts||[]).forEach(a=>{
+    if(a.cat!==undefined && a.category===undefined){ a.category=a.cat||"其他"; fixed++; }
+    if(a.category===undefined){ a.category="其他"; fixed++; }
+    delete a.cat;
+  });
+  (state.templates||[]).forEach(t=>{
+    if(t.category===undefined){ t.category=t.cat||"其他"; fixed++; }
+    delete t.cat;
+  });
+  if(fixed){ try{ localStorage.setItem(KEYS.accounts,JSON.stringify(state.accounts)); localStorage.setItem(KEYS.templates,JSON.stringify(state.templates)); }catch(e){} }
 }
 function save(){
   localStorage.setItem(KEYS.todos,JSON.stringify(state.todos));
@@ -652,6 +668,68 @@ function save(){
   scheduleCloudPush();
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+
+/* ============ 本地快照（最多 3 份 · 拉云端/恢复前自动备份） ============ */
+const SNAP_MAX=3;
+function getSnaps(){ try{ return JSON.parse(localStorage.getItem(KEYS.snapshots)||"[]"); }catch(e){ return []; } }
+function snapPayload(){ return JSON.parse(JSON.stringify({todos:state.todos,accounts:state.accounts,habits:state.habits,fitness:state.fitness,templates:state.templates||[],budget:state.budget,seeded:state.seeded})); }
+function snapCount(d){ return (d.todos?d.todos.length:0)+(d.accounts?d.accounts.length:0)+(d.habits?d.habits.length:0)+(d.fitness?d.fitness.length:0); }
+function takeSnapshot(reason){
+  const snaps=getSnaps();
+  const data=snapPayload();
+  snaps.unshift({id:uid(),ts:Date.now(),reason:reason||"手动快照",count:snapCount(data),data});
+  const kept=snaps.slice(0,SNAP_MAX);
+  try{ localStorage.setItem(KEYS.snapshots,JSON.stringify(kept)); }
+  catch(e){ toast("快照保存失败：本机存储空间不足",true); return null; }
+  return kept;
+}
+function fmtSnapTime(ts){ const d=new Date(ts); return dstr(d)+" "+pad(d.getHours())+":"+pad(d.getMinutes()); }
+function restoreSnapshot(id){
+  const s=getSnaps().find(x=>x.id===id); if(!s) return;
+  confirmModal({
+    title:"恢复快照",
+    msg:"将用 <b>"+fmtSnapTime(s.ts)+"</b>（"+esc(s.reason)+"，"+s.count+" 条记录）的快照<b>覆盖当前全部数据</b>。恢复前会自动快照当前数据，最多保留 "+SNAP_MAX+" 份。确定继续？",
+    okText:"恢复",
+    onOk:()=>{
+      takeSnapshot("恢复快照前自动备份");
+      state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],templates:[],budget:3000,seeded:true},JSON.parse(JSON.stringify(s.data||{})));
+      save();refreshAll();closeModal();
+      toast("已恢复到快照 ✓"); openSnapModal();
+    }
+  });
+}
+function openSnapModal(){
+  const box=document.getElementById("modalBox");
+  const snaps=getSnaps();
+  box.innerHTML=`
+    <div class="modal-h"><h3>📸 本地快照</h3><button class="modal-x" id="mSnapClose" aria-label="关闭">关闭</button></div>
+    <p style="font-size:12.5px;color:var(--sub);margin:0 0 10px;">快照保存在本机浏览器，最多保留 ${SNAP_MAX} 份（新的会挤掉最旧的）。<b>拉取云端数据前会自动备份一份</b>，数据被覆盖时可在这里找回。</p>
+    <button class="btn-primary" id="mSnapNow" style="margin-top:0;">立即拍摄快照</button>
+    ${snaps.length?('<div class="list" style="margin-top:11px;">'+snaps.map(s=>`
+      <div class="item">
+        <div class="body">
+          <div class="t1">${fmtSnapTime(s.ts)}</div>
+          <div class="t2"><span>${esc(s.reason)} · ${s.count} 条记录</span></div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="db-btn" data-snapres="${s.id}" style="min-height:34px;padding:6px 10px;">恢复</button>
+          <button class="del" data-snapdel="${s.id}">✕</button>
+        </div>
+      </div>`).join("")+'</div>'):'<div class="empty" style="margin-top:11px;">还没有快照。可手动拍摄，或等拉取云端数据时自动生成</div>'}`;
+  document.getElementById("mSnapClose").addEventListener("click",closeModal);
+  document.getElementById("mSnapNow").addEventListener("click",()=>{
+    if(takeSnapshot("手动快照")){ toast("快照已保存 ✓"); openSnapModal(); }
+  });
+  box.querySelectorAll("[data-snapres]").forEach(b=>b.addEventListener("click",()=>restoreSnapshot(b.dataset.snapres)));
+  box.querySelectorAll("[data-snapdel]").forEach(b=>b.addEventListener("click",()=>{
+    confirmModal({title:"删除快照",msg:"删除后无法找回，确定？",okText:"删除",danger:true,onOk:()=>{
+      const kept=getSnaps().filter(x=>x.id!==b.dataset.snapdel);
+      localStorage.setItem(KEYS.snapshots,JSON.stringify(kept));
+      openSnapModal(); toast("已删除快照");
+    }});
+  }));
+  openModal();
+}
 
 /* ============ 日期工具 ============ */
 function pad(n){return n<10?"0"+n:""+n;}
@@ -1281,6 +1359,7 @@ function bindEvents(){
   document.getElementById("btnExport").addEventListener("click",exportJSON);
   document.getElementById("btnExportCSV").addEventListener("click",exportCSV);
   document.getElementById("btnImport").addEventListener("click",()=>document.getElementById("fileInput").click());
+  document.getElementById("btnSnap").addEventListener("click",openSnapModal);
   document.getElementById("fileInput").addEventListener("change",importJSON);
   document.getElementById("btnClearSample").addEventListener("click",clearSample);
   // modal close
@@ -1321,7 +1400,9 @@ function addAccountModal(){
     type=tp.type||"expense";
     document.querySelectorAll("#mAAddType button").forEach(x=>x.classList.toggle("on",x.dataset.v===type));
     fill();
-    document.getElementById("mAAddCat").value=tp.category;
+    const catSel=document.getElementById("mAAddCat");
+    if(tp.category && !Array.from(catSel.options).some(o=>o.value===tp.category)) catSel.add(new Option(tp.category,tp.category));
+    catSel.value=tp.category||catSel.value;
     document.getElementById("mAAddAmount").value=tp.amount;
     document.getElementById("mAAddNote").value=tp.note||"";
   });
@@ -1343,7 +1424,7 @@ function addAccountModal(){
   document.getElementById("mAAddSave").addEventListener("click",()=>{
     const amount=parseFloat(document.getElementById("mAAddAmount").value);
     if(!(amount>0)){alert("请输入有效金额");return;}
-    state.accounts.push({id:uid(),type,amount,cat:document.getElementById("mAAddCat").value,date:document.getElementById("mAAddDate").value||todayStr(),note:document.getElementById("mAAddNote").value.trim()});
+    state.accounts.push({id:uid(),type,amount,category:document.getElementById("mAAddCat").value,date:document.getElementById("mAAddDate").value||todayStr(),note:document.getElementById("mAAddNote").value.trim()});
     save();refreshAll();closeModal();
   });
   openModal();
@@ -1654,6 +1735,7 @@ async function cloudPull(){
   try{
     const d=await apiFetch("/api/me");
     const inc=d.data||{};
+    takeSnapshot("拉取云端前自动备份");
     state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],templates:[],budget:3000,seeded:true},inc);
     save(); refreshAll(); CLOUD.lastErr="";
     const n=(inc.todos?inc.todos.length:0)+(inc.accounts?inc.accounts.length:0)+(inc.habits?inc.habits.length:0)+(inc.fitness?inc.fitness.length:0);

@@ -21,7 +21,7 @@
     background:var(--bg);color:var(--ink);font-size:16px;line-height:1.5;
     padding-bottom:calc(72px + env(safe-area-inset-bottom));
   }
-  .wrap{max-width:880px;margin:0 auto;padding:0 14px;}
+  .wrap{max-width:880px;margin:0 auto;padding:12px 14px 0;}
   /* Top bar — always visible; hosts hamburger on all viewports */
   header{
     position:sticky;top:0;z-index:35;background:linear-gradient(135deg,var(--coral),#FF9A6B);
@@ -36,10 +36,13 @@
   .spacer{flex:1;}
   .sync{display:flex;align-items:center;gap:6px;font-size:12px;background:rgba(255,255,255,.22);padding:5px 10px;border-radius:999px;}
   .sync .dot{width:8px;height:8px;border-radius:50%;background:#FFE08A;box-shadow:0 0 0 3px rgba(255,224,138,.3);}
-  /* Today banner */
-  .today{background:var(--card);margin:12px auto 0;max-width:880px;border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
-  .today-h{display:flex;align-items:center;gap:8px;padding:12px 14px 6px;font-weight:700;}
-  .today-h .badge{background:var(--coral-l);color:var(--coral-d);font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;}
+  /* 顶栏「今天要处理」入口按钮 + 角标 */
+  .today-btn{position:relative;}
+  .today-badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;
+    border-radius:999px;background:#fff;color:var(--coral-d);font-size:10px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.18);}
+  .today-badge[hidden]{display:none;}
+  /* Today list（弹框内复用） */
   .today-list{max-height:190px;overflow:auto;padding:0 8px 8px;}
   .t-item{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:10px;}
   .t-item+.t-item{border-top:1px solid var(--line);}
@@ -128,6 +131,14 @@
   .modal{background:#fff;border-radius:18px;padding:18px;width:100%;max-width:380px;max-height:86vh;overflow:auto;}
   .modal h3{margin:0 0 12px;font-size:17px;}
   .modal .btn-primary{margin-top:10px;}
+  /* 今日待处理弹框 */
+  .modal-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .modal-h h3{margin:0;display:flex;align-items:center;gap:8px;font-size:17px;}
+  .modal-h .badge{background:var(--coral-l);color:var(--coral-d);font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;}
+  .modal-x{border:none;background:var(--coral-l);color:var(--coral-d);font-weight:600;font-size:13px;
+    padding:6px 12px;border-radius:9px;cursor:pointer;min-height:34px;flex:0 0 auto;font-family:inherit;}
+  .modal-x:active{background:#FFD9CD;}
+  .modal .today-list{max-height:min(58vh,380px);padding:0;}
   /* ============ 布局：应用列（顶栏 + 内容）随左侧抽屉收缩而让位 ============ */
   .app{margin-left:var(--drawer-w);transition:margin-left .22s cubic-bezier(.2,.8,.25,1);}
   .drawer.collapsed ~ .app{margin-left:var(--drawer-w-collapsed);}
@@ -206,11 +217,22 @@
   }
   /* 小屏适配：收紧间距，保证底部导航触控舒适 */
   @media(max-width:480px){
-    .wrap{padding:0 10px;}
+    .wrap{padding:10px 10px 0;}
     .card{padding:14px;margin-bottom:12px;}
     .bottom-nav button{font-size:10px;}
     .bottom-nav button svg{width:20px;height:20px;}
     .stats{gap:8px;}
+    /* 顶栏：logo 与「本地存储」胶囊收窄，给今日图标留位 */
+    .head-row{gap:8px;}
+    .logo{font-size:16px;gap:6px;}
+    .logo svg{width:20px;height:20px;}
+    .sync{font-size:11px;padding:4px 8px;}
+    .sync .dot{width:7px;height:7px;}
+  }
+  @media(max-width:360px){
+    .logo span,.logo{white-space:nowrap;}
+    .sync #syncText{display:none;}
+    .sync{padding:6px;gap:0;}
   }
 </style>
 </head>
@@ -258,6 +280,10 @@
       全能工作台
     </div>
     <div class="spacer"></div>
+    <button class="menu-btn today-btn" id="todayBtn" aria-label="今天要处理" title="今天要处理">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v4.8l3.4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3v1.4M21 12h-1.4M12 21v-1.4M3 12h1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".55"/></svg>
+      <span class="today-badge" id="todayBadge" hidden>0</span>
+    </button>
     <div class="sync"><span class="dot"></span><span id="syncText">本地存储</span></div>
   </div>
 </header>
@@ -265,15 +291,6 @@
 <div class="banner-top" id="offlineBanner" style="display:none">⚠️ 离线模式：操作已暂存本地，联网后将自动同步</div>
 
 <div class="wrap">
-  <!-- 今天要处理 -->
-  <div class="today">
-    <div class="today-h">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 3v9l5 3" stroke="#FF7A59" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="#FF7A59" stroke-width="2"/></svg>
-      今天要处理 <span class="badge" id="todayCount">0</span>
-    </div>
-    <div class="today-list" id="todayList"></div>
-  </div>
-
   <!-- PC tabs -->
   <div class="tabs" id="pcTabs">
     <button class="tab active" data-tab="account"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9 12h6M12 9v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>记账</button>
@@ -493,8 +510,8 @@ function refreshAll(){
   checkBackupHint();
 }
 
-/* 今天要处理 */
-function renderToday(){
+/* 今天要处理（顶栏图标 → 弹框） */
+function todayItems(){
   const t=todayStr();
   const items=[];
   // 待办：逾期 + 今天未完成
@@ -508,15 +525,42 @@ function renderToday(){
       items.push({type:"habit",id:h.id,title:"打卡「"+h.name+"」",meta:"今日待完成",overdue:false,ic:"M12 6v6l4 2"});
     }
   });
-  const box=document.getElementById("todayList");
-  document.getElementById("todayCount").textContent=items.length;
-  if(items.length===0){box.innerHTML='<div class="t-empty">🎉 今天没有待处理事项，轻松一下！</div>';return;}
-  box.innerHTML=items.map(it=>`
+  return items;
+}
+function todayListHTML(items){
+  if(items.length===0) return '<div class="t-empty">🎉 今天没有待处理事项，轻松一下！</div>';
+  return items.map(it=>`
     <div class="t-item ${it.overdue?'t-overdue':''}">
       <div class="t-ic"><svg viewBox="0 0 24 24" fill="none"><path d="${it.ic}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div class="t-main"><div class="t-title">${esc(it.title)}</div><div class="t-meta">${esc(it.meta)}</div></div>
       <button class="t-btn" data-act="${it.type}" data-id="${it.id}">完成</button>
     </div>`).join("");
+}
+function renderToday(){
+  const items=todayItems();
+  // 顶栏角标
+  const badge=document.getElementById("todayBadge");
+  if(badge){ badge.textContent=items.length; badge.hidden=items.length===0; }
+  // 弹框内容（打开时同步刷新）
+  const list=document.getElementById("todayModalList");
+  if(list) list.innerHTML=todayListHTML(items);
+  const cnt=document.getElementById("todayModalCount");
+  if(cnt) cnt.textContent=items.length;
+}
+function openTodayModal(){
+  const box=document.getElementById("modalBox");
+  box.innerHTML=`
+    <div class="modal-h">
+      <h3>⏰ 今天要处理 <span class="badge" id="todayModalCount">0</span></h3>
+      <button class="modal-x" id="todayModalClose" aria-label="关闭">关闭</button>
+    </div>
+    <div class="today-list" id="todayModalList"></div>`;
+  box.querySelector("#todayModalClose").addEventListener("click",closeModal);
+  box.querySelector("#todayModalList").addEventListener("click",e=>{
+    const b=e.target.closest(".t-btn"); if(b) handleToday(b.dataset.act,b.dataset.id);
+  });
+  openModal();
+  renderToday();
 }
 function handleToday(act,id){
   const t=todayStr();
@@ -816,10 +860,8 @@ function bindEvents(){
   document.getElementById("navCollapse").addEventListener("click",toggleNav);
   document.getElementById("scrim").addEventListener("click",closeMobileDrawer);
   window.addEventListener("resize",applyNav);
-  // 今天要处理 完成
-  document.getElementById("todayList").addEventListener("click",e=>{
-    const btn=e.target.closest(".t-btn"); if(btn) handleToday(btn.dataset.act,btn.dataset.id);
-  });
+  // 今天要处理：顶栏图标 → 弹框（列表内「完成」在弹框渲染时绑定）
+  document.getElementById("todayBtn").addEventListener("click",openTodayModal);
   // 记账类型切换
   document.querySelectorAll("#accType button").forEach(b=>b.addEventListener("click",()=>{
     document.querySelectorAll("#accType button").forEach(x=>x.classList.remove("on"));
@@ -870,6 +912,7 @@ function bindEvents(){
   document.getElementById("btnClearSample").addEventListener("click",clearSample);
   // modal close
   document.getElementById("mask").addEventListener("click",e=>{if(e.target.id==="mask")closeModal();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
 }
 function fillCatOptions(type){
   const arr=type==="income"?CAT_INCOME:CAT_EXPENSE;

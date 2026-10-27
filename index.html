@@ -677,7 +677,7 @@ function save(){
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 
 /* ============ 本地快照（最多 3 份 · 拉云端/恢复前自动备份） ============ */
-const SNAP_MAX=3;
+const SNAP_MAX=5;
 function getSnaps(){ try{ return JSON.parse(localStorage.getItem(KEYS.snapshots)||"[]"); }catch(e){ return []; } }
 function snapPayload(){ return JSON.parse(JSON.stringify({todos:state.todos,accounts:state.accounts,habits:state.habits,fitness:state.fitness,templates:state.templates||[],budget:state.budget,seeded:state.seeded})); }
 function snapCount(d){ return (d.todos?d.todos.length:0)+(d.accounts?d.accounts.length:0)+(d.habits?d.habits.length:0)+(d.fitness?d.fitness.length:0); }
@@ -968,7 +968,6 @@ function inPeriod(dateStr,key,period){
   if(period==="month") return monthOf(dateStr)===key;
   return dateStr.slice(0,4)===key;
 }
-const PERIOD_LABEL={day:"今日",week:"本周",month:"本月",year:"今年"};
 function renderStats(){
   const seg=document.getElementById("statsSeg"); if(!seg) return;
   seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===statsView));

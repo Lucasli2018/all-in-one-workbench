@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>全能工作台</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FF9A76'/%3E%3Cstop offset='1' stop-color='%23F4553C'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Cpath d='M17 34 28 45 47 22' stroke='white' stroke-width='7.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='50' cy='14' r='5' fill='%23FFE08A'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FF9A76'/%3E%3Cstop offset='1' stop-color='%23F4553C'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Crect x='12' y='12' width='17' height='17' rx='5' fill='white'/%3E%3Crect x='35' y='12' width='17' height='17' rx='5' fill='%23FFE08A'/%3E%3Crect x='12' y='35' width='17' height='17' rx='5' fill='white' opacity='.82'/%3E%3Crect x='35' y='35' width='17' height='17' rx='5' fill='white'/%3E%3C/svg%3E">
 <style>
   :root{
     --coral:#FF7A59; --coral-d:#F2603C; --coral-l:#FFE9E2;
@@ -236,12 +236,13 @@
   .drawer-item .di-label{transition:opacity .15s;}
   .drawer-item:hover{background:rgba(var(--acc-rgb),.10);color:var(--coral-d);}
   .drawer-item.active{background:linear-gradient(135deg,var(--coral),var(--accent-2));color:#fff;box-shadow:0 8px 18px rgba(var(--acc-rgb),.32);}
-  .drawer-foot{margin-top:auto;font-size:12px;color:var(--sub);line-height:1.6;padding:14px 8px 2px;border-top:1px solid rgba(0,0,0,.06);}
+  .drawer-item.danger{color:#C9403C;}
+  .drawer-item.danger:hover{background:rgba(217,83,79,.10);color:#C9403C;}
 
-  /* ---------- 抽屉内「数据备份」区（原首页底部卡片收纳于此） ---------- */
-  .drawer-backup{margin-top:14px;padding:12px 8px 0;border-top:1px solid rgba(0,0,0,.06);}
-  .db-title{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--sub);margin-bottom:9px;letter-spacing:.3px;}
-  .db-title svg{width:15px;height:15px;flex:0 0 auto;opacity:.7;}
+  /* ---------- 抽屉工具入口：云端服务 / 数据备份 / 清空数据（点击弹框） ---------- */
+  .drawer-tools{margin-top:14px;padding:12px 4px 0;border-top:1px solid rgba(0,0,0,.06);display:flex;flex-direction:column;gap:6px;}
+  .drawer-tools .drawer-item{padding:11px 12px;}
+  .di-label em{display:block;font-style:normal;font-size:11px;font-weight:500;color:var(--sub);margin-top:1px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .db-actions{display:grid;gap:6px;}
   .db-btn{border:none;background:rgba(var(--acc-rgb),.10);color:var(--coral-d);font-size:13px;font-weight:600;
     padding:9px 11px;border-radius:10px;cursor:pointer;font-family:inherit;text-align:left;min-height:38px;
@@ -250,7 +251,8 @@
   .db-btn:active{background:rgba(var(--acc-rgb),.26);}
   .db-btn.danger{background:rgba(217,83,79,.09);color:#C9403C;}
   .db-btn.danger:hover{background:rgba(217,83,79,.16);}
-  .db-hint{font-size:11px;color:var(--sub);line-height:1.5;margin:9px 0 0;}
+  .db-title{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--sub);margin-bottom:9px;letter-spacing:.3px;}
+  .db-title svg{width:15px;height:15px;flex:0 0 auto;opacity:.7;}
 
   /* 抽屉内「主题切换」区 */
   .drawer-theme{margin-top:14px;padding:12px 8px 0;border-top:1px solid rgba(0,0,0,.06);}
@@ -264,22 +266,18 @@
   .theme-sw.on{border-color:var(--coral);box-shadow:0 0 0 2px rgba(var(--acc-rgb),.16);}
   .theme-sw.on i{color:var(--coral-d);}
 
-  /* 抽屉内「云端账户」区 */
-  .drawer-account{margin-top:14px;padding:12px 8px 0;border-top:1px solid rgba(0,0,0,.06);}  .da-user{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  /* 「云端服务」弹框内账户行（.da-* 供弹框复用） */
+  .da-user{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
   .da-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--coral),var(--accent-2));color:#fff;font-weight:800;font-size:16px;display:grid;place-items:center;flex:0 0 auto;}
   .da-info{flex:1;min-width:0;}
   .da-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .da-sub{font-size:11px;color:var(--sub);}
-  .da-actions{display:grid;gap:6px;}
 
   /* 桌面收缩态：折叠为仅图标栏 */
   .drawer.collapsed{width:var(--drawer-w-collapsed);padding-left:10px;padding-right:10px;}
   .drawer.collapsed .dl-txt,
   .drawer.collapsed .di-label,
-  .drawer.collapsed .drawer-foot,
-  .drawer.collapsed .drawer-theme,
-  .drawer.collapsed .drawer-backup,
-  .drawer.collapsed .drawer-account{display:none;}
+  .drawer.collapsed .drawer-theme{display:none;}
   .drawer.collapsed .drawer-logo{flex-direction:column;justify-content:center;gap:6px;padding:6px 0 12px;}
   .drawer.collapsed .drawer-item{justify-content:center;padding:13px 0;gap:0;}
 
@@ -301,7 +299,6 @@
     .drawer.collapsed{width:var(--drawer-w);}
     .drawer.collapsed .dl-txt,
     .drawer.collapsed .di-label,
-    .drawer.collapsed .drawer-foot,
     .drawer.collapsed .drawer-collapse{display:revert;}
     .bottom-nav{display:flex;}
     body{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));}
@@ -445,26 +442,22 @@
     </div>
   </div>
 
-  <!-- 云端账户（登录 / 注册 / 同步） -->
-  <div class="drawer-account" id="drawerAccount"></div>
-
-  <!-- 数据备份（原首页底部卡片，收纳进抽屉） -->
-  <div class="drawer-backup">
-    <div class="db-title">
+  <!-- 工具入口：点击弹框（云端服务 / 数据备份 / 清空数据） -->
+  <div class="drawer-tools">
+    <button class="drawer-item" id="menuCloud">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M7 18a4.5 4.5 0 1 1 .9-8.9 5.5 5.5 0 0 1 10.6 1.6A3.7 3.7 0 0 1 17.8 18Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span class="di-label">云端服务<em id="cloudRowSub">检测中…</em></span>
+    </button>
+    <button class="drawer-item" id="menuBackup">
       <svg viewBox="0 0 24 24" fill="none"><path d="M4 7a8 3 0 1 0 16 0A8 3 0 1 0 4 7" stroke="currentColor" stroke-width="1.9"/><path d="M4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7" stroke="currentColor" stroke-width="1.9"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" stroke="currentColor" stroke-width="1.9"/></svg>
-      <span>数据备份</span>
-    </div>
-    <div class="db-actions">
-      <button class="db-btn" id="btnExport">导出 JSON 备份</button>
-      <button class="db-btn" id="btnExportCSV">导出 CSV</button>
-      <button class="db-btn" id="btnImport">导入恢复</button>
-      <button class="db-btn" id="btnSnap">📸 本地快照</button>
-      <button class="db-btn danger" id="btnClearSample">清空示例数据</button>
-    </div>
-    <input type="file" id="fileInput" accept="application/json" style="display:none">
-    <p class="db-hint">数据仅存于本机浏览器（localStorage），建议定期导出备份。累计 30 条后将提醒备份。</p>
+      <span class="di-label">数据备份</span>
+    </button>
+    <button class="drawer-item danger" id="menuClear">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="di-label">清空数据</span>
+    </button>
   </div>
-  <div class="drawer-foot">本地存储 · 隐私无忧<br>数据仅存于本机浏览器</div>
+  <input type="file" id="fileInput" accept="application/json" style="display:none">
 </aside>
 
 <div class="scrim" id="scrim"></div>
@@ -688,10 +681,9 @@ function restoreSnapshot(id){
   const s=getSnaps().find(x=>x.id===id); if(!s) return;
   confirmModal({
     title:"恢复快照",
-    msg:"将用 <b>"+fmtSnapTime(s.ts)+"</b>（"+esc(s.reason)+"，"+s.count+" 条记录）的快照<b>覆盖当前全部数据</b>。恢复前会自动快照当前数据，最多保留 "+SNAP_MAX+" 份。确定继续？",
+    msg:"将用 <b>"+fmtSnapTime(s.ts)+"</b>（"+esc(s.reason)+"，"+s.count+" 条记录）的快照<b>覆盖当前全部数据</b>。确定继续？",
     okText:"恢复",
     onOk:()=>{
-      takeSnapshot("恢复快照前自动备份");
       state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],templates:[],budget:3000,seeded:true},JSON.parse(JSON.stringify(s.data||{})));
       save();refreshAll();closeModal();
       toast("已恢复到快照 ✓"); openSnapModal();
@@ -1294,8 +1286,8 @@ function setTheme(name){
 }
 
 function bindEvents(){
-  // tab
-  document.querySelectorAll(".tab,#bottomNav button,.drawer-item").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
+  // tab（仅带 data-tab 的导航项；抽屉工具行「云端服务/数据备份/清空数据」单独绑定）
+  document.querySelectorAll(".tab,#bottomNav button,.drawer-item[data-tab]").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   // 导航：汉堡开合抽屉 / 收缩；遮罩点关
   document.getElementById("navToggle").addEventListener("click",toggleNav);
   document.getElementById("navCollapse").addEventListener("click",toggleNav);
@@ -1355,13 +1347,11 @@ function bindEvents(){
     const ed=e.target.closest("[data-edit='acc']"); if(ed){editAccount(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='acc']"); if(d){state.accounts=state.accounts.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
-  // 备份
-  document.getElementById("btnExport").addEventListener("click",exportJSON);
-  document.getElementById("btnExportCSV").addEventListener("click",exportCSV);
-  document.getElementById("btnImport").addEventListener("click",()=>document.getElementById("fileInput").click());
-  document.getElementById("btnSnap").addEventListener("click",openSnapModal);
+  // 抽屉工具入口：云端服务 / 数据备份 / 清空数据（点击弹框）
+  document.getElementById("menuCloud").addEventListener("click",()=>{ closeMobileDrawer(); openCloudModal(); });
+  document.getElementById("menuBackup").addEventListener("click",()=>{ closeMobileDrawer(); openBackupModal(); });
+  document.getElementById("menuClear").addEventListener("click",()=>{ closeMobileDrawer(); clearSample(); });
   document.getElementById("fileInput").addEventListener("change",importJSON);
-  document.getElementById("btnClearSample").addEventListener("click",clearSample);
   // modal close
   document.getElementById("mask").addEventListener("click",e=>{if(e.target.id==="mask")closeModal();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
@@ -1423,7 +1413,7 @@ function addAccountModal(){
   document.getElementById("mAAddClose").addEventListener("click",closeModal);
   document.getElementById("mAAddSave").addEventListener("click",()=>{
     const amount=parseFloat(document.getElementById("mAAddAmount").value);
-    if(!(amount>0)){alert("请输入有效金额");return;}
+    if(!(amount>0)){toast("请输入有效金额",true);return;}
     state.accounts.push({id:uid(),type,amount,category:document.getElementById("mAAddCat").value,date:document.getElementById("mAAddDate").value||todayStr(),note:document.getElementById("mAAddNote").value.trim()});
     save();refreshAll();closeModal();
   });
@@ -1459,7 +1449,7 @@ function editBudget(){
     <button class="btn-primary" id="mBudgetSave">保存</button>`;
   document.getElementById("mBudgetSave").addEventListener("click",()=>{
     const v=parseFloat(document.getElementById("mBudget").value);
-    if(!(v>=0)){alert("请输入有效金额");return;}
+    if(!(v>=0)){toast("请输入有效金额",true);return;}
     state.budget=v;save();refreshAll();closeModal();
   });
   openModal();
@@ -1478,7 +1468,7 @@ function addTodoModal(){
   document.getElementById("mTdClose").addEventListener("click",closeModal);
   document.getElementById("mTdSave").addEventListener("click",()=>{
     const title=document.getElementById("mTdTitle").value.trim();
-    if(!title){alert("请输入待办事项");return;}
+    if(!title){toast("请输入待办事项",true);return;}
     state.todos.push({id:uid(),title,date:document.getElementById("mTdDate").value||todayStr(),priority:document.getElementById("mTdPri").value,done:false});
     save();refreshAll();closeModal();
   });
@@ -1498,7 +1488,7 @@ function addFitnessModal(){
   document.getElementById("mFitClose").addEventListener("click",closeModal);
   document.getElementById("mFitSave").addEventListener("click",()=>{
     const weight=parseFloat(document.getElementById("mFitW").value);
-    if(!(weight>0)){alert("请输入体重");return;}
+    if(!(weight>0)){toast("请输入体重",true);return;}
     const fr=document.getElementById("mFitF").value;
     const fat=fr===""?null:parseFloat(fr);
     const date=document.getElementById("mFitD").value||todayStr();
@@ -1523,7 +1513,7 @@ function editTodo(id){
     <button class="btn-primary" id="mTodoSave">保存</button>`;
   document.getElementById("mTodoSave").addEventListener("click",()=>{
     const title=document.getElementById("mTodoTitle").value.trim();
-    if(!title){alert("请输入事项");return;}
+    if(!title){toast("请输入事项",true);return;}
     x.title=title;x.date=document.getElementById("mTodoDate").value||x.date;
     x.priority=document.getElementById("mTodoPri").value;
     save();refreshAll();closeModal();
@@ -1551,7 +1541,7 @@ function editAccount(id){
   mfill();
   document.getElementById("mAccSave").addEventListener("click",()=>{
     const amount=parseFloat(document.getElementById("mAccAmount").value);
-    if(!(amount>0)){alert("请输入有效金额");return;}
+    if(!(amount>0)){toast("请输入有效金额",true);return;}
     a.type=mtype;a.amount=amount;a.category=document.getElementById("mAccCat").value;
     a.date=document.getElementById("mAccDate").value||a.date;a.note=document.getElementById("mAccNote").value.trim();
     save();refreshAll();closeModal();
@@ -1571,7 +1561,7 @@ function editFitness(id){
     <button class="btn-primary" id="mFitSave">保存</button>`;
   document.getElementById("mFitSave").addEventListener("click",()=>{
     const w=parseFloat(document.getElementById("mFitW").value);
-    if(!(w>0)){alert("请输入体重");return;}
+    if(!(w>0)){toast("请输入体重",true);return;}
     const fr=document.getElementById("mFitF").value;
     f.weight=w;f.fat=fr===""?null:parseFloat(fr);
     f.date=document.getElementById("mFitD").value||f.date;f.note=document.getElementById("mFitN").value.trim();
@@ -1590,7 +1580,7 @@ function editHabit(id){
   document.getElementById("mHR").innerHTML=HABIT_COLORS.map(c=>`<div data-c="${c}" style="width:34px;height:34px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===sel?"#fff":"transparent"};box-shadow:0 0 0 1px #ddd;"></div>`).join("");
   document.querySelectorAll("#mHR div").forEach(d=>d.addEventListener("click",()=>{sel=d.dataset.c;document.querySelectorAll("#mHR div").forEach(x=>x.style.borderColor=x.dataset.c===sel?"#fff":"transparent");}));
   document.getElementById("mHS").addEventListener("click",()=>{
-    const name=document.getElementById("mHN").value.trim();if(!name){alert("请输入名称");return;}
+    const name=document.getElementById("mHN").value.trim();if(!name){toast("请输入名称",true);return;}
     h.name=name;h.color=sel;save();refreshAll();closeModal();
   });
   openModal();
@@ -1611,7 +1601,7 @@ function openHabitModal(){
   }));
   document.getElementById("mHabitSave").addEventListener("click",()=>{
     const name=document.getElementById("mHabitName").value.trim();
-    if(!name){alert("请输入习惯名称");return;}
+    if(!name){toast("请输入习惯名称",true);return;}
     state.habits.push({id:uid(),name,color:sel,records:{}});
     save();refreshAll();closeModal();
   });
@@ -1658,22 +1648,35 @@ function importJSON(e){
       if(d.fitness)state.fitness=d.fitness;
       if(d.templates)state.templates=d.templates;
       if(d.budget!=null)state.budget=d.budget;
+      migrateLegacy();
       save();refreshAll();
-      alert("导入成功，共恢复 "+totalCount()+" 条数据");
-    }catch(err){alert("文件格式错误，导入失败");}
+      openImportDoneModal(totalCount());
+    }catch(err){ toast("文件格式错误，导入失败",true); }
   };
   r.readAsText(f);e.target.value="";
 }
+// 导入成功 → 应用内弹框（替代原生 alert，webview 中会被拦截）
+function openImportDoneModal(n){
+  const box=document.getElementById("modalBox");
+  box.innerHTML=`
+    <div class="modal-h"><h3>✅ 导入成功</h3><button class="modal-x" id="mImpX" aria-label="关闭">关闭</button></div>
+    <p style="font-size:13.5px;color:var(--ink);line-height:1.8;margin:0 0 14px;">已成功从备份文件恢复 <b>${n}</b> 条数据到本机。</p>
+    <button class="btn-primary" id="mImpOk" style="margin-top:0;">好的</button>`;
+  document.getElementById("mImpX").addEventListener("click",closeModal);
+  document.getElementById("mImpOk").addEventListener("click",closeModal);
+  openModal();
+}
 function clearSample(){
   confirmModal({
-    title:"🗑 清空全部数据",
-    msg:"将清空<strong>记账 / 习惯 / 待办 / 减脂的所有数据（含示例）</strong>，此操作不可恢复，建议先在下方「导出 JSON 备份」。",
+    title:"🗑 清空本地数据",
+    msg:"将清空<strong>本机的记账 / 习惯 / 待办 / 减脂 / 模板数据</strong>（可用「📸 本地快照」找回）。<strong>云端数据不受影响</strong>，清空结果也不会自动上传。确定继续？",
     okText:"确认清空", danger:true,
     onOk:()=>{
-      state.todos=[];state.accounts=[];state.habits=[];state.fitness=[];
+      state.todos=[];state.accounts=[];state.habits=[];state.fitness=[];state.templates=[];
       state.seeded=true; /* 清空后置为已播种，避免下次进入又种回示例数据 */
+      CLOUD.skipPush=true; /* 本次清空不自动回推云端，避免把云端也覆盖成空 */
       save();refreshAll();
-      toast("已清空全部数据");
+      toast("已清空本地数据（云端保持不变）");
     }
   });
 }
@@ -1759,6 +1762,7 @@ async function afterLoginSync(){
 }
 // 改动后防抖自动上传（拉取过程中/拉取后的保存不回推，避免覆盖云端造成「从云端同步无效」）
 function scheduleCloudPush(){
+  if(CLOUD.skipPush){ CLOUD.skipPush=false; return; } /* 一次性跳过（如清空本地数据后不回推） */
   if(CLOUD.syncing) return;
   if(!CLOUD.on||!CLOUD.user||!CLOUD.auto) return;
   if(_pushTimer) clearTimeout(_pushTimer);
@@ -1770,46 +1774,72 @@ function updateSyncPill(){
   if(CLOUD.user){ t.textContent="已同步云端"; if(dot) dot.style.background="#9CF0C2"; }
   else{ t.textContent="本地存储"; if(dot) dot.style.background=""; }
 }
+// 抽屉「云端服务」行的状态小字
 function buildAccountArea(){
-  const el=document.getElementById("drawerAccount"); if(!el) return;
-  if(CLOUD.user){
-    el.innerHTML=`<div class="da-user">
-        <div class="da-avatar">${esc(CLOUD.user.slice(0,1).toUpperCase())}</div>
-        <div class="da-info"><div class="da-name">${esc(CLOUD.user)}</div><div class="da-sub">${CLOUD.on?"已连接云端":"未连接"}</div></div>
-      </div>
-      <div class="da-actions">
-        <button class="db-btn" id="daSync">☁ 同步到云端</button>
-        <button class="db-btn" id="daPull">⬇ 从云端同步</button>
-        <button class="db-btn" id="daAuto">${CLOUD.auto?"✓ 自动同步：开":"○ 自动同步：关"}</button>
-        <button class="db-btn danger" id="daLogout">退出登录</button>
-      </div>`;
-    el.querySelector("#daSync").onclick=()=>{
-      confirmModal({
-        title:"☁ 同步到云端",
-        msg:"将把<strong>本机当前全部数据上传并覆盖云端副本</strong>。确定继续吗？",
-        okText:"开始上传",
-        onOk:async()=>{ try{ await cloudPush(); toast("已同步到云端 ✓"); }catch(e){ toast("同步失败："+(e.message||e),true); } }
-      });
-    };
-    el.querySelector("#daPull").onclick=()=>{
-      confirmModal({
-        title:"⬇ 从云端同步",
-        msg:"将用<strong>云端数据覆盖本机全部数据</strong>，本机未上传的改动将丢失。确定继续吗？",
-        okText:"开始同步",
-        onOk:async()=>{
-          try{
-            const n=await cloudPull();
-            toast(n>0?("已从云端同步 "+n+" 条数据到本机 ✓"):"云端暂无数据，本机保持不变");
-          }catch(e){ toast("同步失败："+(e.message||e),true); }
-        }
-      });
-    };
-    el.querySelector("#daAuto").onclick=()=>{ CLOUD.auto=!CLOUD.auto; cloudStore(); buildAccountArea(); toast(CLOUD.auto?"已开启自动同步":"已关闭自动同步"); };
-    el.querySelector("#daLogout").onclick=async()=>{ await cloudLogout(); toast("已退出登录"); };
-  }else{
-    el.innerHTML=`<button class="db-btn" id="daLogin" style="background:rgba(var(--acc-rgb),.14);font-weight:700;">☁ 登录 / 注册（多设备同步）</button>`;
-    el.querySelector("#daLogin").onclick=openCloudPanel;
-  }
+  const el=document.getElementById("cloudRowSub"); if(!el) return;
+  el.textContent = CLOUD.user ? (CLOUD.on ? CLOUD.user : CLOUD.user+"（未连接）") : "未登录";
+}
+// 云端服务弹框：未登录 → 登录/注册面板；已登录 → 账户信息 + 同步操作
+function openCloudModal(){
+  if(!CLOUD.user){ openCloudPanel(); return; }
+  const box=document.getElementById("modalBox");
+  box.innerHTML=`
+    <div class="modal-h"><h3>☁ 云端服务</h3><button class="modal-x" id="mClX" aria-label="关闭">关闭</button></div>
+    <div class="da-user">
+      <div class="da-avatar">${esc(CLOUD.user.slice(0,1).toUpperCase())}</div>
+      <div class="da-info"><div class="da-name">${esc(CLOUD.user)}</div><div class="da-sub" id="mClState">${CLOUD.on?"已连接云端":"未连接（离线）"}</div></div>
+    </div>
+    <div class="db-actions">
+      <button class="db-btn" id="daSync">☁ 同步到云端（本机 → 云端）</button>
+      <button class="db-btn" id="daPull">⬇ 从云端同步（云端 → 本机）</button>
+      <button class="db-btn" id="daAuto">${CLOUD.auto?"✓ 自动同步：开":"○ 自动同步：关"}</button>
+      <button class="db-btn danger" id="daLogout">退出登录</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--sub);margin:10px 0 0;">同步为整包覆盖：上传会覆盖云端副本，拉取会覆盖本机数据（拉取前自动快照）。</p>`;
+  document.getElementById("mClX").addEventListener("click",closeModal);
+  document.getElementById("daSync").addEventListener("click",()=>{
+    confirmModal({
+      title:"☁ 同步到云端",
+      msg:"将把<strong>本机当前全部数据上传并覆盖云端副本</strong>。确定继续吗？",
+      okText:"开始上传",
+      onOk:async()=>{ try{ await cloudPush(); toast("已同步到云端 ✓"); }catch(e){ toast("同步失败："+(e.message||e),true); } }
+    });
+  });
+  document.getElementById("daPull").addEventListener("click",()=>{
+    confirmModal({
+      title:"⬇ 从云端同步",
+      msg:"将用<strong>云端数据覆盖本机全部数据</strong>，本机未上传的改动将丢失（拉取前自动快照，可在「数据备份 → 本地快照」找回）。确定继续吗？",
+      okText:"开始同步",
+      onOk:async()=>{
+        try{
+          const n=await cloudPull();
+          toast(n>0?("已从云端同步 "+n+" 条数据到本机 ✓"):"云端暂无数据，本机保持不变");
+        }catch(e){ toast("同步失败："+(e.message||e),true); }
+      }
+    });
+  });
+  document.getElementById("daAuto").addEventListener("click",()=>{ CLOUD.auto=!CLOUD.auto; cloudStore(); buildAccountArea(); toast(CLOUD.auto?"已开启自动同步":"已关闭自动同步"); openCloudModal(); });
+  document.getElementById("daLogout").addEventListener("click",async()=>{ await cloudLogout(); closeModal(); toast("已退出登录"); });
+  openModal();
+}
+// 数据备份弹框：导出 / 导入 / 快照
+function openBackupModal(){
+  const box=document.getElementById("modalBox");
+  box.innerHTML=`
+    <div class="modal-h"><h3>🗄 数据备份</h3><button class="modal-x" id="mBkClose" aria-label="关闭">关闭</button></div>
+    <p style="font-size:12.5px;color:var(--sub);margin:0 0 10px;">数据保存在本机浏览器（localStorage），建议定期导出备份。</p>
+    <div class="db-actions">
+      <button class="db-btn" id="btnExport">📤 导出 JSON 备份</button>
+      <button class="db-btn" id="btnExportCSV">📄 导出 CSV（仅记账）</button>
+      <button class="db-btn" id="btnImport">📥 导入恢复（JSON）</button>
+      <button class="db-btn" id="btnSnap">📸 本地快照（最多 3 份）</button>
+    </div>`;
+  document.getElementById("mBkClose").addEventListener("click",closeModal);
+  document.getElementById("btnExport").addEventListener("click",exportJSON);
+  document.getElementById("btnExportCSV").addEventListener("click",exportCSV);
+  document.getElementById("btnImport").addEventListener("click",()=>document.getElementById("fileInput").click());
+  document.getElementById("btnSnap").addEventListener("click",openSnapModal);
+  openModal();
 }
 function openCloudPanel(){
   const box=document.getElementById("modalBox");

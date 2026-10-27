@@ -950,22 +950,22 @@ function renderAccGroupedList(list){
 let statsView="trend";
 let statsPeriod="month"; // day / week / month / year
 function shortNum(n){ return n>=10000?(n/10000).toFixed(1)+"w":String(Math.round(n)); }
-function last6Months(){
-  const [Y,M]=todayStr().split("-").map(Number);
-  const arr=[];
-  for(let i=5;i>=0;i--){ const d=new Date(Y,M-1-i,1); arr.push(d.getFullYear()+"-"+pad(d.getMonth()+1)); }
-  return arr;
-}
 // 周起始（周一）
 function weekStart(s){ const d=parseD(s); const w=(d.getDay()+6)%7; d.setDate(d.getDate()-w); return dstr(d); }
-// 某周期下最近 n 个桶的 key（升序）
-function periodKeys(period,n=6){
-  const t=todayStr(); const arr=[];
-  if(period==="day"){ for(let i=n-1;i>=0;i--) arr.push(addDays(t,-i)); }
-  else if(period==="week"){ const ws=weekStart(t); for(let i=n-1;i>=0;i--) arr.push(addDays(ws,-7*i)); }
-  else if(period==="month"){ arr.push(...last6Months()); }
-  else { const Y=+t.slice(0,4); for(let i=n-1;i>=0;i--) arr.push(String(Y-i)); }
-  return arr;
+// 周期 → 统计范围的桶：日/周视图看当月，月视图看当年，年视图看全部年份
+function trendBuckets(period){
+  const t=todayStr();
+  if(period==="day"||period==="week"){
+    const m=monthOf(t); const [Y,M]=m.split("-").map(Number);
+    const days=new Date(Y,M,0).getDate();
+    if(period==="day"){ const ks=[]; for(let i=1;i<=days;i++) ks.push(m+"-"+pad(i)); return ks; }
+    const ks=[];
+    for(let i=1;i<=days;i++){ const ws=weekStart(m+"-"+pad(i)); if(!ks.includes(ws)) ks.push(ws); }
+    return ks;
+  }
+  if(period==="month"){ const Y=+t.slice(0,4); const ks=[]; for(let i=1;i<=12;i++) ks.push(Y+"-"+pad(i)); return ks; }
+  const ys=[...new Set(state.accounts.map(a=>a.date.slice(0,4)).concat([t.slice(0,4)]))].sort();
+  return ys;
 }
 // 记录日期是否落在某周期的桶内
 function inPeriod(dateStr,key,period){
@@ -983,15 +983,17 @@ function renderStats(){
   box.innerHTML=statsView==="trend"?trendChart(statsPeriod):rankBars(statsPeriod);
 }
 function trendChart(period){
-  const data=periodKeys(period,period==="day"?7:6).map(k=>{
+  const keys=trendBuckets(period);
+  const data=keys.map(k=>{
     const list=state.accounts.filter(a=>inPeriod(a.date,k,period));
     return { k,
       inc:list.filter(a=>a.type==="income").reduce((s,a)=>s+a.amount,0),
       out:list.filter(a=>a.type==="expense").reduce((s,a)=>s+a.amount,0) };
   });
   const max=Math.max(1,...data.map(d=>Math.max(d.inc,d.out)));
-  const W=360,H=200,bottom=26,topPad=16,pad=34,bw=15,n=data.length;
+  const W=360,H=200,bottom=26,topPad=16,pad=34,n=data.length;
   const slot=(W-2*pad)/n;
+  const bw=Math.max(3,Math.min(15,slot*0.5));
   const plotH=H-bottom-topPad;
   let svg="";
   for(let g=0;g<=4;g++){
@@ -999,17 +1001,26 @@ function trendChart(period){
     svg+=`<line x1="${pad-4}" y1="${yy}" x2="${W-pad+6}" y2="${yy}" stroke="var(--line)" stroke-width="1"/>`;
     svg+=`<text x="2" y="${yy+3}" font-size="9" fill="var(--sub)">${shortNum(max*g/4)}</text>`;
   }
+  const showLabel=i=>period==="day"?(i%5===4||i===n-1):true;
   data.forEach((d,i)=>{
     const cx=pad+slot*i+slot/2;
     const hi=plotH*(d.inc/max), ho=plotH*(d.out/max);
-    svg+=`<rect x="${(cx-bw-2).toFixed(1)}" y="${(H-bottom-Math.max(hi,1)).toFixed(1)}" width="${bw}" height="${Math.max(hi,1).toFixed(1)}" rx="3" fill="var(--green)"/>`;
-    svg+=`<rect x="${(cx+2).toFixed(1)}" y="${(H-bottom-Math.max(ho,1)).toFixed(1)}" width="${bw}" height="${Math.max(ho,1).toFixed(1)}" rx="3" fill="var(--coral)"/>`;
-    const label=period==="year"?d.k:d.k.slice(2).replace("-","/");
-    svg+=`<text x="${cx.toFixed(1)}" y="${H-8}" font-size="9" fill="var(--sub)" text-anchor="middle">${label}</text>`;
-    if(d.inc>0) svg+=`<text x="${(cx-bw/2-2).toFixed(1)}" y="${(H-bottom-hi-4).toFixed(1)}" font-size="8" fill="var(--green)" text-anchor="middle">${shortNum(d.inc)}</text>`;
-    if(d.out>0) svg+=`<text x="${(cx+bw/2+2).toFixed(1)}" y="${(H-bottom-ho-4).toFixed(1)}" font-size="8" fill="var(--coral-d)" text-anchor="middle">${shortNum(d.out)}</text>`;
+    svg+=`<rect x="${(cx-bw-1).toFixed(1)}" y="${(H-bottom-Math.max(hi,1)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(hi,1).toFixed(1)}" rx="2" fill="var(--green)"/>`;
+    svg+=`<rect x="${(cx+1).toFixed(1)}" y="${(H-bottom-Math.max(ho,1)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(ho,1).toFixed(1)}" rx="2" fill="var(--coral)"/>`;
+    let label;
+    if(period==="year") label=d.k;
+    else if(period==="month") label=String(+d.k.slice(5,7));
+    else if(period==="week") label=d.k.slice(5).replace("-","/");
+    else label=String(+d.k.slice(8,10));
+    if(showLabel(i)) svg+=`<text x="${cx.toFixed(1)}" y="${H-8}" font-size="9" fill="var(--sub)" text-anchor="middle">${label}</text>`;
+    if(d.inc>0&&bw>=6) svg+=`<text x="${(cx-bw/2-1).toFixed(1)}" y="${(H-bottom-hi-4).toFixed(1)}" font-size="8" fill="var(--green)" text-anchor="middle">${shortNum(d.inc)}</text>`;
+    if(d.out>0&&bw>=6) svg+=`<text x="${(cx+bw/2+1).toFixed(1)}" y="${(H-bottom-ho-4).toFixed(1)}" font-size="8" fill="var(--coral-d)" text-anchor="middle">${shortNum(d.out)}</text>`;
   });
-  const cap={day:"近 7 日",week:"近 6 周",month:"近 6 月",year:"近 6 年"}[period]||"";
+  const t=todayStr();
+  const cap=period==="day"?(+t.slice(5,7)+"月逐日")
+    :period==="week"?(+t.slice(5,7)+"月逐周")
+    :period==="month"?(t.slice(0,4)+"年逐月")
+    :"全部年份";
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:480px;display:block;margin:0 auto;">${svg}</svg>
     <div style="font-size:11px;color:var(--sub);display:flex;gap:14px;justify-content:center;margin-top:2px;">
       <span><span class="cat-dot" style="background:var(--green)"></span>收入</span>
@@ -1019,11 +1030,14 @@ function trendChart(period){
 }
 function rankBars(period){
   const t=todayStr();
-  const key=period==="day"?t:(period==="week"?weekStart(t):(period==="month"?monthOf(t):t.slice(0,4)));
+  let list=state.accounts.filter(a=>a.type==="expense"),cap;
+  if(period==="day"||period==="week"){ const m=monthOf(t); list=list.filter(a=>monthOf(a.date)===m); cap="当月"; }
+  else if(period==="month"){ const y=t.slice(0,4); list=list.filter(a=>a.date.slice(0,4)===y); cap="今年"; }
+  else { cap="全部"; }
   const byCat={};
-  state.accounts.filter(a=>a.type==="expense"&&inPeriod(a.date,key,period)).forEach(a=>{byCat[a.category]=(byCat[a.category]||0)+a.amount;});
+  list.forEach(a=>{byCat[a.category]=(byCat[a.category]||0)+a.amount;});
   const entries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
-  if(!entries.length) return `<div class="empty">${PERIOD_LABEL[period]}暂无支出</div>`;
+  if(!entries.length) return `<div class="empty">${cap}暂无支出</div>`;
   const total=entries.reduce((s,e)=>s+e[1],0);
   const max=entries[0][1];
   return entries.map(([cat,val])=>`
@@ -1037,7 +1051,7 @@ function rankBars(period){
         <div style="height:100%;width:${Math.max(3,val/max*100).toFixed(1)}%;background:${catColor('expense',cat)};border-radius:999px;"></div>
       </div>
     </div>`).join("")+
-    `<div style="font-size:11px;color:var(--sub);margin-top:2px;">${PERIOD_LABEL[period]}支出合计 ¥${fmt(total)}</div>`;
+    `<div style="font-size:11px;color:var(--sub);margin-top:2px;">${cap}支出合计 ¥${fmt(total)}</div>`;
 }
 
 /* 习惯 */

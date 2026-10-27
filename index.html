@@ -265,6 +265,76 @@
     .sync #syncText{display:none;}
     .sync{padding:6px;gap:0;}
   }
+
+  /* ============================================================
+     UI 打磨：动效、焦点态、悬浮反馈、滚动条、渐变数值
+     ============================================================ */
+  /* 1) 弹框入场动画（淡入 + 轻微上浮缩放，keyframes 保证 display 切换也生效） */
+  .mask.show{animation:maskIn .18s ease;}
+  @keyframes maskIn{from{opacity:0;}to{opacity:1;}}
+  .mask .modal{will-change:transform,opacity;}
+  .mask.show .modal{animation:modalIn .24s cubic-bezier(.2,.8,.25,1);}
+  @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}
+  /* 2) 模块切换淡入 */
+  .sec.active{animation:secIn .24s cubic-bezier(.2,.8,.25,1);}
+  @keyframes secIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  @media(prefers-reduced-motion:reduce){
+    .sec.active{animation:none;}
+    .mask.show,.mask.show .modal{animation:none;}
+    .app,.drawer{transition:none;}
+  }
+  /* 3) 卡片悬浮微反馈（仅桌面指针设备） */
+  @media(hover:hover) and (min-width:760px){
+    .card{transition:transform .18s ease,box-shadow .18s ease;}
+    .card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(40,40,60,.10);}
+    .stat{transition:transform .18s ease,box-shadow .18s ease;}
+    .stat:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(255,122,89,.16);}
+    .btn-primary{transition:background .15s,transform .1s,box-shadow .15s;}
+    .btn-primary:hover{background:#FF8A6B;box-shadow:0 8px 20px rgba(255,122,89,.30);}
+    .btn-primary:active{transform:scale(.985);}
+    .add-ic:hover,.ic-btn:hover{background:#FFD9CD;}
+    .db-btn{transition:background .15s,transform .1s;}
+    .db-btn:active{transform:scale(.985);}
+  }
+  /* 4) 表单焦点环（珊瑚橙柔和光圈） */
+  input:focus-visible,select:focus-visible,textarea:focus-visible{
+    outline:none;border-color:var(--coral);box-shadow:0 0 0 3px rgba(255,122,89,.16);
+  }
+  .seg button{transition:background .15s,color .15s;}
+  .menu-btn,.today-btn{transition:background .15s,transform .1s;}
+  .menu-btn:hover{background:rgba(255,255,255,.30);}
+  .today-btn:hover{background:rgba(255,255,255,.30);}
+  .today-btn:active{transform:scale(.94);}
+  .modal-x:hover{background:#FFD9CD;}
+  /* 5) 统计数值：渐变字 + 等宽数字 */
+  .stat .v{
+    background:linear-gradient(135deg,var(--coral-d),#FF9A6B);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    font-variant-numeric:tabular-nums;letter-spacing:-.3px;
+  }
+  .amt-in,.amt-out{font-variant-numeric:tabular-nums;}
+  /* 6) 细滚动条（珊瑚橙点缀） */
+  *{scrollbar-width:thin;scrollbar-color:#E8C7BC transparent;}
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-thumb{background:#E8C7BC;border-radius:999px;}
+  ::-webkit-scrollbar-thumb:hover{background:#F0A48C;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  /* 7) toast 上滑入场 */
+  #wbToast{transform:translateX(-50%) translateY(8px) !important;opacity:0;}
+  #wbToast.on{transform:translateX(-50%) translateY(0) !important;opacity:1 !important;}
+  /* 8) 底部导航 active 图标轻微上浮 */
+  .bottom-nav button{transition:color .15s;}
+  .bottom-nav button svg{transition:transform .18s cubic-bezier(.2,.8,.25,1);}
+  .bottom-nav button.active svg{transform:translateY(-2px);}
+  /* 9) 抽屉项按压反馈 */
+  .drawer-item:active{transform:scale(.985);}
+  .drawer-item{transition:background .15s,color .15s,transform .1s;}
+  /* 10) 空状态更精致 */
+  .empty,.t-empty{padding:26px 0;font-size:13.5px;opacity:.85;}
+  /* 11) 列表项 hover（桌面） */
+  @media(hover:hover) and (min-width:760px){
+    .item:hover,.habit:hover{border-color:#FFD3C7;background:#FFFBF9;}
+  }
 </style>
 </head>
 <body>
@@ -1349,11 +1419,12 @@ function toast(msg,isErr){
   let t=document.getElementById("wbToast");
   if(!t){
     t=document.createElement("div"); t.id="wbToast";
-    t.style.cssText="position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:80;background:rgba(43,43,51,.94);color:#fff;font-size:13px;padding:9px 14px;border-radius:10px;max-width:88vw;box-shadow:0 6px 20px rgba(0,0,0,.2);transition:opacity .25s;pointer-events:none;text-align:center;";
+    t.style.cssText="position:fixed;left:50%;bottom:84px;z-index:80;background:rgba(43,43,51,.94);color:#fff;font-size:13px;padding:9px 14px;border-radius:10px;max-width:88vw;box-shadow:0 6px 20px rgba(0,0,0,.2);transition:opacity .25s,transform .25s;pointer-events:none;text-align:center;";
     document.body.appendChild(t);
   }
-  t.textContent=msg; t.style.background=isErr?"rgba(200,64,60,.95)":"rgba(43,43,51,.94)"; t.style.opacity="1";
-  clearTimeout(t._tm); t._tm=setTimeout(()=>{ t.style.opacity="0"; },2200);
+  t.textContent=msg; t.style.background=isErr?"rgba(200,64,60,.95)":"rgba(43,43,51,.94)";
+  void t.offsetWidth; t.classList.add("on");
+  clearTimeout(t._tm); t._tm=setTimeout(()=>{ t.classList.remove("on"); },2200);
 }
 /* 应用内二次确认弹框（替代原生 confirm，内嵌 webview 中原生对话框会被拦截导致按钮失效） */
 function confirmModal(opt){

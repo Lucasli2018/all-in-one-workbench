@@ -184,13 +184,27 @@
   .drawer-item.active{background:linear-gradient(135deg,var(--coral),#FF9A6B);color:#fff;box-shadow:0 8px 18px rgba(255,122,89,.32);}
   .drawer-foot{margin-top:auto;font-size:12px;color:var(--sub);line-height:1.6;padding:14px 8px 2px;border-top:1px solid rgba(0,0,0,.06);}
 
+  /* ---------- 抽屉内「数据备份」区（原首页底部卡片收纳于此） ---------- */
+  .drawer-backup{margin-top:14px;padding:12px 8px 0;border-top:1px solid rgba(0,0,0,.06);}
+  .db-title{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--sub);margin-bottom:9px;letter-spacing:.3px;}
+  .db-title svg{width:15px;height:15px;flex:0 0 auto;opacity:.7;}
+  .db-actions{display:grid;gap:6px;}
+  .db-btn{border:none;background:rgba(255,122,89,.10);color:var(--coral-d);font-size:13px;font-weight:600;
+    padding:9px 11px;border-radius:10px;cursor:pointer;font-family:inherit;text-align:left;min-height:38px;
+    transition:background .15s;}
+  .db-btn:hover{background:rgba(255,122,89,.18);}
+  .db-btn:active{background:rgba(255,122,89,.26);}
+  .db-btn.danger{background:rgba(217,83,79,.09);color:#C9403C;}
+  .db-btn.danger:hover{background:rgba(217,83,79,.16);}
+  .db-hint{font-size:11px;color:var(--sub);line-height:1.5;margin:9px 0 0;}
+
   /* 桌面收缩态：折叠为仅图标栏 */
   .drawer.collapsed{width:var(--drawer-w-collapsed);padding-left:10px;padding-right:10px;}
   .drawer.collapsed .dl-txt,
   .drawer.collapsed .di-label,
   .drawer.collapsed .drawer-foot,
-  .drawer.collapsed .drawer-collapse{display:none;}
-  .drawer.collapsed .drawer-logo{justify-content:center;padding:6px 0 16px;}
+  .drawer.collapsed .drawer-backup{display:none;}
+  .drawer.collapsed .drawer-logo{flex-direction:column;justify-content:center;gap:6px;padding:6px 0 12px;}
   .drawer.collapsed .drawer-item{justify-content:center;padding:13px 0;gap:0;}
 
   /* 顶部 tabs 已弃用，统一隐藏（桌面用抽屉、手机用底部导航） */
@@ -200,6 +214,8 @@
   @media(min-width:760px){
     .bottom-nav{display:none;}
     body{padding-bottom:18px;}
+    /* 桌面抽屉常驻，顶栏汉堡无意义（收缩 / 展开用抽屉内按钮），隐藏 */
+    #navToggle{display:none;}
   }
   /* ---------- 移动：抽屉为覆盖层（抽屉式），底部导航固定 ---------- */
   @media(max-width:759px){
@@ -240,7 +256,6 @@
 <div class="bg-deco"></div>
 <aside class="drawer" id="drawer">
   <div class="drawer-logo">
-    <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="#FF7A59" stroke-width="2.2" stroke-linecap="round"/><circle cx="18" cy="15" r="3.2" stroke="#FF7A59" stroke-width="2.2"/></svg>
     <span class="dl-txt">全能工作台</span>
     <button class="drawer-collapse" id="navCollapse" aria-label="收起 / 展开侧边导航" title="收起 / 展开导航">
       <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -264,6 +279,22 @@
       <span class="di-label">减脂</span>
     </button>
   </nav>
+
+  <!-- 数据备份（原首页底部卡片，收纳进抽屉） -->
+  <div class="drawer-backup">
+    <div class="db-title">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 7a8 3 0 1 0 16 0A8 3 0 1 0 4 7" stroke="currentColor" stroke-width="1.9"/><path d="M4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7" stroke="currentColor" stroke-width="1.9"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" stroke="currentColor" stroke-width="1.9"/></svg>
+      <span>数据备份</span>
+    </div>
+    <div class="db-actions">
+      <button class="db-btn" id="btnExport">导出 JSON 备份</button>
+      <button class="db-btn" id="btnExportCSV">导出 CSV</button>
+      <button class="db-btn" id="btnImport">导入恢复</button>
+      <button class="db-btn danger" id="btnClearSample">清空示例数据</button>
+    </div>
+    <input type="file" id="fileInput" accept="application/json" style="display:none">
+    <p class="db-hint">数据仅存于本机浏览器（localStorage），建议定期导出备份。累计 30 条后将提醒备份。</p>
+  </div>
   <div class="drawer-foot">本地存储 · 隐私无忧<br>数据仅存于本机浏览器</div>
 </aside>
 
@@ -275,10 +306,7 @@
     <button class="menu-btn" id="navToggle" aria-label="打开导航" aria-expanded="false" title="菜单">
       <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
     </button>
-    <div class="logo">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><circle cx="18" cy="15" r="3.2" stroke="#fff" stroke-width="2.2"/></svg>
-      全能工作台
-    </div>
+    <div class="logo">全能工作台</div>
     <div class="spacer"></div>
     <button class="menu-btn today-btn" id="todayBtn" aria-label="今天要处理" title="今天要处理">
       <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v4.8l3.4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3v1.4M21 12h-1.4M12 21v-1.4M3 12h1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".55"/></svg>
@@ -401,19 +429,6 @@
       <div class="list" id="fitList"></div>
     </div>
   </section>
-
-  <!-- 数据工具 -->
-  <div class="card">
-    <div class="card-h"><h3>💾 数据备份</h3></div>
-    <div class="toolbar">
-      <button class="ic-btn" id="btnExport">导出 JSON 备份</button>
-      <button class="ic-btn" id="btnExportCSV">导出 CSV</button>
-      <button class="ic-btn" id="btnImport">导入恢复</button>
-      <button class="ic-btn" id="btnClearSample">清空示例数据</button>
-    </div>
-    <input type="file" id="fileInput" accept="application/json" style="display:none">
-    <p style="font-size:12px;color:var(--sub);margin:4px 0 0;">数据仅存于本机浏览器（localStorage），建议定期导出备份。累计 30 条后将提醒备份。</p>
-  </div>
 </div>
 </div>
 
@@ -1075,12 +1090,12 @@ function closeModal(){document.getElementById("mask").classList.remove("show");}
 /* 备份 */
 function totalCount(){return state.todos.length+state.accounts.length+state.habits.length+state.fitness.length;}
 function checkBackupHint(){
-  const w=document.getElementById("offlineBanner");
   let hint=document.querySelector(".warn");
   if(totalCount()>=30 && !hint){
     hint=document.createElement("div");hint.className="warn";
-    hint.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 9v4M12 17h.01" stroke="#B5760A" stroke-width="2" stroke-linecap="round"/><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="#B5760A" stroke-width="2"/></svg>数据已积累 '+totalCount()+' 条，建议点「导出 JSON 备份」防止丢失';
-    document.querySelector(".wrap").insertBefore(hint,document.querySelector(".wrap").children[3]);
+    hint.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 9v4M12 17h.01" stroke="#B5760A" stroke-width="2" stroke-linecap="round"/><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="#B5760A" stroke-width="2"/></svg>数据已积累 '+totalCount()+' 条，建议在左侧「数据备份」导出 JSON 防止丢失';
+    const wrap=document.querySelector(".wrap");
+    if(wrap) wrap.insertBefore(hint,wrap.firstElementChild);
   }
 }
 function exportJSON(){

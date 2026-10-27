@@ -579,6 +579,7 @@
       <div class="card-h"><h3>📋 待办清单</h3>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="sub" id="todoRate">点击圆圈完成</span>
+          <button class="ic-btn" id="todoArchBtn" style="min-height:34px;padding:5px 10px;display:none;" title="查看已归档待办">📦 归档 <b id="archCount">0</b></button>
           <button class="add-ic" id="todoAddBtn" aria-label="添加待办" title="添加待办">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
           </button>
@@ -998,12 +999,18 @@ function calcStreak(records){
 /* 待办 */
 function renderTodos(){
   const t=todayStr();
-  const total=state.todos.length;
-  const done=state.todos.filter(x=>x.done).length;
+  const active=state.todos.filter(x=>!x.archived);
+  const total=active.length;
+  const done=active.filter(x=>x.done).length;
   const rate=total?Math.round(done/total*100):0;
   document.getElementById("todoRate").textContent="完成率 "+rate+"%";
+  // 归档入口（有归档才显示）
+  const archBtn=document.getElementById("todoArchBtn");
+  const archN=state.todos.filter(x=>x.archived).length;
+  archBtn.style.display=archN?"":"none";
+  document.getElementById("archCount").textContent=archN;
   const order={P0:0,P1:1,P2:2};
-  const sorted=state.todos.slice().sort((a,b)=>{
+  const sorted=active.slice().sort((a,b)=>{
     if(a.done!==b.done) return a.done?1:-1;
     if(a.date!==b.date) return a.date<b.date?-1:1;
     return order[a.priority]-order[b.priority];
@@ -1018,10 +1025,42 @@ function renderTodos(){
         <div class="t1">${esc(x.title)}</div>
         <div class="t2"><span class="pill p-${x.priority}">${x.priority}</span><span style="${overdue?'color:var(--red);':''}">${x.date}${overdue?' · 逾期':''}</span></div>
       </div>
+      ${x.done?`<button class="del" data-arch="${x.id}" title="归档">📦</button>`:""}
       <button class="del" data-edit="todo" data-id="${x.id}" title="编辑">✎</button>
       <button class="del" data-del="todo" data-id="${x.id}">✕</button>
     </div>`;
   }).join("");
+}
+/* 归档箱 */
+function openArchModal(){
+  const box=document.getElementById("modalBox");
+  const list=state.todos.filter(x=>x.archived).sort((a,b)=>a.date<b.date?1:-1);
+  box.innerHTML=`
+    <div class="modal-h"><h3>📦 已归档待办 <span class="badge">${list.length}</span></h3><button class="modal-x" id="mArchClose" aria-label="关闭">关闭</button></div>
+    <p style="font-size:12.5px;color:var(--sub);margin:0 0 10px;">已完成的待办可点 📦 归档，从主清单隐藏；随时可恢复或彻底删除。</p>
+    ${list.length?('<div class="list">'+list.map(x=>`
+      <div class="item done">
+        <div class="body">
+          <div class="t1">${esc(x.title)}</div>
+          <div class="t2"><span class="pill p-${x.priority}">${x.priority}</span><span>${x.date}</span></div>
+        </div>
+        <button class="ic-btn" data-unarch="${x.id}" style="min-height:34px;padding:5px 10px;">恢复</button>
+        <button class="del" data-archdel="${x.id}" title="彻底删除">✕</button>
+      </div>`).join("")+'</div>'):'<div class="empty">归档箱是空的</div>'}`;
+  document.getElementById("mArchClose").addEventListener("click",closeModal);
+  box.querySelectorAll("[data-unarch]").forEach(b=>b.addEventListener("click",()=>{
+    const x=state.todos.find(z=>z.id===b.dataset.unarch); if(!x) return;
+    x.archived=false; save(); refreshAll(); openArchModal(); toast("已恢复到待办清单");
+  }));
+  box.querySelectorAll("[data-archdel]").forEach(b=>b.addEventListener("click",()=>{
+    confirmModal({
+      title:"🗑 彻底删除",
+      msg:"将从归档箱<strong>永久删除</strong>这条待办，不可恢复。确定吗？",
+      okText:"删除", danger:true,
+      onOk:()=>{ state.todos=state.todos.filter(z=>z.id!==b.dataset.archdel); save(); refreshAll(); openArchModal(); toast("已彻底删除"); }
+    });
+  }));
+  openModal();
 }
 
 /* 减脂 */
@@ -1220,8 +1259,10 @@ function bindEvents(){
   });
   // 待办：点击 + 图标 → 弹框录入
   document.getElementById("todoAddBtn").addEventListener("click",addTodoModal);
+  document.getElementById("todoArchBtn").addEventListener("click",openArchModal);
   document.getElementById("todoList").addEventListener("click",e=>{
     const c=e.target.closest("[data-chk]"); if(c){const x=state.todos.find(z=>z.id===c.dataset.chk);if(x){x.done=!x.done;save();refreshAll();}return;}
+    const ar=e.target.closest("[data-arch]"); if(ar){const x=state.todos.find(z=>z.id===ar.dataset.arch);if(x){x.archived=true;save();refreshAll();toast("已归档，可在「📦 归档」中查看");}return;}
     const ed=e.target.closest("[data-edit='todo']"); if(ed){editTodo(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='todo']"); if(d){state.todos=state.todos.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });

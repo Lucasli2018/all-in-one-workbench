@@ -185,6 +185,12 @@
   .tpl-chip small{color:var(--coral-d);font-weight:700;}
   .tpl-chip:hover{border-color:var(--item-hbd);background:var(--item-hbg);}
   .tpl-chip:active{background:var(--accent-soft);}
+  /* 模板行「快速记一笔」按钮 */
+  .tpl-add{border:none;background:rgba(var(--acc-rgb),.12);color:var(--coral-d);font-size:17px;font-weight:700;
+    cursor:pointer;flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+    padding:0;min-height:34px;line-height:1;transition:background .15s;}
+  .tpl-add:hover{background:rgba(var(--acc-rgb),.22);}
+  .tpl-add:active{background:rgba(var(--acc-rgb),.30);}
   .warn{background:#FFF6E5;border:1px solid #FFE2A8;color:#B5760A;font-size:13px;padding:10px 12px;border-radius:11px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
   .banner-top{background:var(--banner-bg);border:1px solid var(--banner-bd);color:var(--coral-d);font-size:13px;padding:9px 14px;margin:10px auto 0;max-width:880px;border-radius:11px;text-align:center;}
   /* Modal */
@@ -1518,16 +1524,23 @@ function openTplModal(){
   const list=(state.templates||[]);
   box.innerHTML=`
     <div class="modal-h"><h3>🗂 记账模板</h3><button class="modal-x" id="mTplClose" aria-label="关闭">关闭</button></div>
-    <p style="font-size:12.5px;color:var(--sub);margin:0 0 10px;">记一笔时点「💾 存为模板」即可把常用消费保存下来，下次一键带入。</p>
+    <p style="font-size:12.5px;color:var(--sub);margin:0 0 10px;">点模板行的 <b>＋</b> 直接按模板记一笔（日期为今天）；记一笔时点「💾 存为模板」可创建模板。</p>
     ${list.length?('<div class="list">'+list.map(tp=>`
       <div class="item">
         <div class="body">
           <div class="t1">${esc(tp.name)}</div>
           <div class="t2"><span>${tp.type==="income"?"收入":"支出"} · ${esc(tp.category)}</span><span class="${tp.type==='income'?'amt-in':'amt-out'}">¥${fmt(tp.amount)}</span></div>
         </div>
+        <button class="tpl-add" data-tpladd="${tp.id}" title="按此模板快速记一笔">＋</button>
         <button class="del" data-tpldel="${tp.id}">✕</button>
       </div>`).join("")+'</div>'):'<div class="empty">还没有模板，记一笔时点「💾 存为模板」创建</div>'}`;
   document.getElementById("mTplClose").addEventListener("click",closeModal);
+  box.querySelectorAll("[data-tpladd]").forEach(b=>b.addEventListener("click",()=>{
+    const tp=(state.templates||[]).find(z=>z.id===b.dataset.tpladd); if(!tp) return;
+    state.accounts.push({id:uid(),type:tp.type||"expense",amount:tp.amount,category:tp.category||"其他",date:todayStr(),note:tp.note||""});
+    save();refreshAll();
+    toast("已按模板「"+tp.name+"」记一笔 ✓");
+  }));
   box.querySelectorAll("[data-tpldel]").forEach(b=>b.addEventListener("click",()=>{
     state.templates=state.templates.filter(z=>z.id!==b.dataset.tpldel);
     save(); openTplModal(); toast("已删除模板");

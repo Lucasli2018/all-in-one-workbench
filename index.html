@@ -168,6 +168,15 @@
   .toolbar .ic-btn{flex:1;min-width:120px;}
   .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
   .filter-bar select,.filter-bar input{flex:1;min-width:110px;}
+  /* 记账模板快捷条 */
+  .tpl-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:11px;}
+  .tpl-chips:empty{display:none;}
+  .tpl-chip{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;
+    padding:6px 11px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;font-family:inherit;
+    display:flex;align-items:center;gap:5px;transition:background .15s,border-color .15s;}
+  .tpl-chip small{color:var(--coral-d);font-weight:700;}
+  .tpl-chip:hover{border-color:var(--item-hbd);background:var(--item-hbg);}
+  .tpl-chip:active{background:var(--accent-soft);}
   .warn{background:#FFF6E5;border:1px solid #FFE2A8;color:#B5760A;font-size:13px;padding:10px 12px;border-radius:11px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
   .banner-top{background:var(--banner-bg);border:1px solid var(--banner-bd);color:var(--coral-d);font-size:13px;padding:9px 14px;margin:10px auto 0;max-width:880px;border-radius:11px;text-align:center;}
   /* Modal */
@@ -502,9 +511,19 @@
       </div>
     </div>
     <div class="card">
+      <div class="card-h"><h3>📈 统计分析</h3>
+        <div class="seg" id="statsSeg" style="padding:3px;">
+          <button data-v="trend" class="on">近6月趋势</button>
+          <button data-v="rank">分类排行</button>
+        </div>
+      </div>
+      <div id="statsBox"></div>
+    </div>
+    <div class="card">
       <div class="card-h"><h3>📜 最近记录</h3>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="sub" id="accTotal"></span>
+          <button class="ic-btn" id="tplMgr" style="min-height:34px;padding:5px 10px;" title="管理记账模板">模板</button>
           <button class="add-ic" id="accAddBtn" aria-label="记一笔" title="记一笔">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
           </button>
@@ -603,11 +622,11 @@
 <script>
 /* ============ 数据层 ============ */
 const PREFIX="wb_allin_";
-const KEYS={todos:PREFIX+"todos",accounts:PREFIX+"accounts",habits:PREFIX+"habits",fitness:PREFIX+"fitness",budget:PREFIX+"budget",seeded:PREFIX+"seeded"};
+const KEYS={todos:PREFIX+"todos",accounts:PREFIX+"accounts",habits:PREFIX+"habits",fitness:PREFIX+"fitness",budget:PREFIX+"budget",seeded:PREFIX+"seeded",templates:PREFIX+"templates"};
 const CAT_EXPENSE=[["餐饮","#FF7A59"],["交通","#5B8DEF"],["购物","#9B6DFF"],["居住","#27AE60"],["娱乐","#F2B705"],["医疗","#E8453C"],["其他","#8A8A95"]];
 const CAT_INCOME=[["工资","#27AE60"],["兼职","#5B8DEF"],["理财","#9B6DFF"],["红包","#FF7A59"],["其他","#8A8A95"]];
 const HABIT_COLORS=["#FF7A59","#5B8DEF","#27AE60","#9B6DFF","#F2B705","#E8453C"];
-let state={todos:[],accounts:[],habits:[],fitness:[],budget:3000,seeded:false};
+let state={todos:[],accounts:[],habits:[],fitness:[],budget:3000,seeded:false,templates:[]};
 
 function loadAll(){
   try{
@@ -615,6 +634,7 @@ function loadAll(){
     state.accounts=JSON.parse(localStorage.getItem(KEYS.accounts)||"[]");
     state.habits=JSON.parse(localStorage.getItem(KEYS.habits)||"[]");
     state.fitness=JSON.parse(localStorage.getItem(KEYS.fitness)||"[]");
+    state.templates=JSON.parse(localStorage.getItem(KEYS.templates)||"[]");
     const b=localStorage.getItem(KEYS.budget); if(b!==null) state.budget=Number(b);
     state.seeded=localStorage.getItem(KEYS.seeded)==="1";
   }catch(e){ console.warn("load err",e); }
@@ -624,6 +644,7 @@ function save(){
   localStorage.setItem(KEYS.accounts,JSON.stringify(state.accounts));
   localStorage.setItem(KEYS.habits,JSON.stringify(state.habits));
   localStorage.setItem(KEYS.fitness,JSON.stringify(state.fitness));
+  localStorage.setItem(KEYS.templates,JSON.stringify(state.templates||[]));
   localStorage.setItem(KEYS.budget,String(state.budget));
   localStorage.setItem(KEYS.seeded,state.seeded?"1":"0");
   checkBackupHint();
@@ -777,6 +798,7 @@ function renderAccounting(){
     (!curCat||a.category===curCat) &&
     (!curKey||(a.note||"").toLowerCase().includes(curKey)||a.category.toLowerCase().includes(curKey))
   ).sort((a,b)=>a.date<b.date?1:-1).slice(0,80);
+  renderStats();
   const box=document.getElementById("accList");
   document.getElementById("accTotal").textContent="共 "+state.accounts.length+" 条"+(filtered.length!==state.accounts.length?"（已筛选 "+filtered.length+"）":"");
   if(filtered.length===0){box.innerHTML='<div class="empty">没有符合条件的记录</div>';return;}
@@ -789,6 +811,75 @@ function renderAccounting(){
       <button class="del" data-edit="acc" data-id="${a.id}" title="编辑">✎</button>
       <button class="del" data-del="acc" data-id="${a.id}">✕</button>
     </div>`).join("");
+}
+
+/* 统计分析（近6月趋势 / 分类排行） */
+let statsView="trend";
+function shortNum(n){ return n>=10000?(n/10000).toFixed(1)+"w":String(Math.round(n)); }
+function last6Months(){
+  const [Y,M]=todayStr().split("-").map(Number);
+  const arr=[];
+  for(let i=5;i>=0;i--){ const d=new Date(Y,M-1-i,1); arr.push(d.getFullYear()+"-"+pad(d.getMonth()+1)); }
+  return arr;
+}
+function renderStats(){
+  const seg=document.getElementById("statsSeg"); if(!seg) return;
+  seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===statsView));
+  const box=document.getElementById("statsBox");
+  box.innerHTML=statsView==="trend"?trendChart():rankBars();
+}
+function trendChart(){
+  const data=last6Months().map(m=>{
+    const list=state.accounts.filter(a=>monthOf(a.date)===m);
+    return { m,
+      inc:list.filter(a=>a.type==="income").reduce((s,a)=>s+a.amount,0),
+      out:list.filter(a=>a.type==="expense").reduce((s,a)=>s+a.amount,0) };
+  });
+  const max=Math.max(1,...data.map(d=>Math.max(d.inc,d.out)));
+  const W=360,H=200,bottom=26,topPad=16,pad=34,bw=15,n=data.length;
+  const slot=(W-2*pad)/n;
+  const plotH=H-bottom-topPad;
+  let svg="";
+  for(let g=0;g<=4;g++){
+    const yy=H-bottom-plotH*g/4;
+    svg+=`<line x1="${pad-4}" y1="${yy}" x2="${W-pad+6}" y2="${yy}" stroke="var(--line)" stroke-width="1"/>`;
+    svg+=`<text x="2" y="${yy+3}" font-size="9" fill="var(--sub)">${shortNum(max*g/4)}</text>`;
+  }
+  data.forEach((d,i)=>{
+    const cx=pad+slot*i+slot/2;
+    const hi=plotH*(d.inc/max), ho=plotH*(d.out/max);
+    svg+=`<rect x="${(cx-bw-2).toFixed(1)}" y="${(H-bottom-Math.max(hi,1)).toFixed(1)}" width="${bw}" height="${Math.max(hi,1).toFixed(1)}" rx="3" fill="var(--green)"/>`;
+    svg+=`<rect x="${(cx+2).toFixed(1)}" y="${(H-bottom-Math.max(ho,1)).toFixed(1)}" width="${bw}" height="${Math.max(ho,1).toFixed(1)}" rx="3" fill="var(--coral)"/>`;
+    svg+=`<text x="${cx.toFixed(1)}" y="${H-8}" font-size="9" fill="var(--sub)" text-anchor="middle">${d.m.slice(2).replace("-","/")}</text>`;
+    if(d.inc>0) svg+=`<text x="${(cx-bw/2-2).toFixed(1)}" y="${(H-bottom-hi-4).toFixed(1)}" font-size="8" fill="var(--green)" text-anchor="middle">${shortNum(d.inc)}</text>`;
+    if(d.out>0) svg+=`<text x="${(cx+bw/2+2).toFixed(1)}" y="${(H-bottom-ho-4).toFixed(1)}" font-size="8" fill="var(--coral-d)" text-anchor="middle">${shortNum(d.out)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:480px;display:block;margin:0 auto;">${svg}</svg>
+    <div style="font-size:11px;color:var(--sub);display:flex;gap:14px;justify-content:center;margin-top:2px;">
+      <span><span class="cat-dot" style="background:var(--green)"></span>收入</span>
+      <span><span class="cat-dot" style="background:var(--coral)"></span>支出</span>
+    </div>`;
+}
+function rankBars(){
+  const m=monthOf(todayStr());
+  const byCat={};
+  state.accounts.filter(a=>a.type==="expense"&&monthOf(a.date)===m).forEach(a=>{byCat[a.category]=(byCat[a.category]||0)+a.amount;});
+  const entries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return '<div class="empty">本月暂无支出</div>';
+  const total=entries.reduce((s,e)=>s+e[1],0);
+  const max=entries[0][1];
+  return entries.map(([cat,val])=>`
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:4px;">
+        <span><span class="cat-dot" style="background:${catColor('expense',cat)}"></span>${esc(cat)}
+          <span style="color:var(--sub);font-size:11px;">${Math.round(val/total*100)}%</span></span>
+        <b style="font-variant-numeric:tabular-nums;">¥${fmt(val)}</b>
+      </div>
+      <div style="height:8px;background:var(--line);border-radius:999px;overflow:hidden;">
+        <div style="height:100%;width:${Math.max(3,val/max*100).toFixed(1)}%;background:${catColor('expense',cat)};border-radius:999px;"></div>
+      </div>
+    </div>`).join("")+
+    `<div style="font-size:11px;color:var(--sub);margin-top:2px;">本月支出合计 ¥${fmt(total)}</div>`;
 }
 
 /* 习惯 */
@@ -1105,6 +1196,12 @@ function bindEvents(){
   document.getElementById("accFMonth").addEventListener("change",renderAccounting);
   document.getElementById("accFCat").addEventListener("change",renderAccounting);
   document.getElementById("accFKey").addEventListener("input",renderAccounting);
+  // 统计分析视图切换 + 模板管理
+  document.getElementById("statsSeg").addEventListener("click",e=>{
+    const b=e.target.closest("button[data-v]"); if(!b) return;
+    statsView=b.dataset.v; renderStats();
+  });
+  document.getElementById("tplMgr").addEventListener("click",openTplModal);
   // 习惯
   document.getElementById("habitAdd").addEventListener("click",openHabitModal);
   document.getElementById("calViewSeg").addEventListener("click",e=>{
@@ -1152,6 +1249,7 @@ function bindEvents(){
 function addAccountModal(){
   document.getElementById("modalBox").innerHTML=`
     <div class="modal-h"><h3>➕ 记一笔</h3><button class="modal-x" id="mAAddClose" aria-label="关闭">关闭</button></div>
+    <div class="tpl-chips" id="mTplChips"></div>
     <div class="seg" id="mAAddType">
       <button class="on" data-v="expense">支出</button>
       <button data-v="income">收入</button>
@@ -1162,11 +1260,44 @@ function addAccountModal(){
     </div>
     <div class="field"><label>日期</label><input type="date" id="mAAddDate" value="${todayStr()}"></div>
     <div class="field"><label>备注</label><input type="text" id="mAAddNote" placeholder="选填"></div>
-    <button class="btn-primary" id="mAAddSave">保存记录</button>`;
+    <div style="display:flex;gap:8px;">
+      <button class="ic-btn" id="mTplSave" style="flex:0 0 auto;min-height:48px;" title="把当前填写内容存为模板">💾 存为模板</button>
+      <button class="btn-primary" id="mAAddSave" style="flex:1;margin-top:0;">保存记录</button>
+    </div>`;
   let type="expense";
   const fill=()=>{const arr=type==="income"?CAT_INCOME:CAT_EXPENSE;document.getElementById("mAAddCat").innerHTML=arr.map(c=>`<option value="${c[0]}">${c[0]}</option>`).join("");};
   document.querySelectorAll("#mAAddType button").forEach(b=>b.addEventListener("click",()=>{type=b.dataset.v;document.querySelectorAll("#mAAddType button").forEach(x=>x.classList.toggle("on",x===b));fill();}));
   fill();
+  // 模板快捷条：点击带入表单
+  const renderChips=()=>{
+    document.getElementById("mTplChips").innerHTML=(state.templates||[]).map(tp=>
+      `<button class="tpl-chip" data-id="${tp.id}" title="点击带入表单">${esc(tp.name)} <small>¥${fmt(tp.amount)}</small></button>`).join("");
+  };
+  renderChips();
+  document.getElementById("mTplChips").addEventListener("click",e=>{
+    const chip=e.target.closest(".tpl-chip"); if(!chip) return;
+    const tp=(state.templates||[]).find(z=>z.id===chip.dataset.id); if(!tp) return;
+    type=tp.type||"expense";
+    document.querySelectorAll("#mAAddType button").forEach(x=>x.classList.toggle("on",x.dataset.v===type));
+    fill();
+    document.getElementById("mAAddCat").value=tp.category;
+    document.getElementById("mAAddAmount").value=tp.amount;
+    document.getElementById("mAAddNote").value=tp.note||"";
+  });
+  // 存为模板（同名覆盖）
+  document.getElementById("mTplSave").addEventListener("click",()=>{
+    const amount=parseFloat(document.getElementById("mAAddAmount").value);
+    if(!(amount>0)){ toast("请先填写有效金额再存为模板",true); return; }
+    const category=document.getElementById("mAAddCat").value;
+    const note=document.getElementById("mAAddNote").value.trim();
+    const name=note||category;
+    if(!state.templates) state.templates=[];
+    const exist=state.templates.find(z=>z.name===name);
+    if(exist){ exist.type=type; exist.category=category; exist.amount=amount; exist.note=note; }
+    else state.templates.push({id:uid(),name,type,category,amount,note});
+    save(); renderChips();
+    toast("已存为模板「"+name+"」");
+  });
   document.getElementById("mAAddClose").addEventListener("click",closeModal);
   document.getElementById("mAAddSave").addEventListener("click",()=>{
     const amount=parseFloat(document.getElementById("mAAddAmount").value);
@@ -1176,6 +1307,28 @@ function addAccountModal(){
   });
   openModal();
   setTimeout(()=>{const el=document.getElementById("mAAddAmount");if(el)el.focus();},50);
+}
+/* 模板管理 */
+function openTplModal(){
+  const box=document.getElementById("modalBox");
+  const list=(state.templates||[]);
+  box.innerHTML=`
+    <div class="modal-h"><h3>🗂 记账模板</h3><button class="modal-x" id="mTplClose" aria-label="关闭">关闭</button></div>
+    <p style="font-size:12.5px;color:var(--sub);margin:0 0 10px;">记一笔时点「💾 存为模板」即可把常用消费保存下来，下次一键带入。</p>
+    ${list.length?('<div class="list">'+list.map(tp=>`
+      <div class="item">
+        <div class="body">
+          <div class="t1">${esc(tp.name)}</div>
+          <div class="t2"><span>${tp.type==="income"?"收入":"支出"} · ${esc(tp.category)}</span><span class="${tp.type==='income'?'amt-in':'amt-out'}">¥${fmt(tp.amount)}</span></div>
+        </div>
+        <button class="del" data-tpldel="${tp.id}">✕</button>
+      </div>`).join("")+'</div>'):'<div class="empty">还没有模板，记一笔时点「💾 存为模板」创建</div>'}`;
+  document.getElementById("mTplClose").addEventListener("click",closeModal);
+  box.querySelectorAll("[data-tpldel]").forEach(b=>b.addEventListener("click",()=>{
+    state.templates=state.templates.filter(z=>z.id!==b.dataset.tpldel);
+    save(); openTplModal(); toast("已删除模板");
+  }));
+  openModal();
 }
 function editBudget(){
   document.getElementById("modalBox").innerHTML=`
@@ -1357,7 +1510,7 @@ function checkBackupHint(){
   }
 }
 function exportJSON(){
-  const data={todos:state.todos,accounts:state.accounts,habits:state.habits,fitness:state.fitness,budget:state.budget,exportedAt:new Date().toISOString()};
+  const data={todos:state.todos,accounts:state.accounts,habits:state.habits,fitness:state.fitness,templates:state.templates||[],budget:state.budget,exportedAt:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="全能工作台备份_"+todayStr()+".json";a.click();
@@ -1381,6 +1534,7 @@ function importJSON(e){
       if(d.accounts)state.accounts=d.accounts;
       if(d.habits)state.habits=d.habits;
       if(d.fitness)state.fitness=d.fitness;
+      if(d.templates)state.templates=d.templates;
       if(d.budget!=null)state.budget=d.budget;
       save();refreshAll();
       alert("导入成功，共恢复 "+totalCount()+" 条数据");
@@ -1459,7 +1613,7 @@ async function cloudPull(){
   try{
     const d=await apiFetch("/api/me");
     const inc=d.data||{};
-    state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],budget:3000,seeded:true},inc);
+    state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],templates:[],budget:3000,seeded:true},inc);
     save(); refreshAll(); CLOUD.lastErr="";
     const n=(inc.todos?inc.todos.length:0)+(inc.accounts?inc.accounts.length:0)+(inc.habits?inc.habits.length:0)+(inc.fitness?inc.fitness.length:0);
     return n;
@@ -1473,7 +1627,7 @@ async function afterLoginSync(){
     const inc=d.data||{};
     const hasData=(inc.todos&&inc.todos.length)||(inc.accounts&&inc.accounts.length)||(inc.habits&&inc.habits.length)||(inc.fitness&&inc.fitness.length);
     if(hasData){
-      state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],budget:3000,seeded:true},inc);
+      state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],templates:[],budget:3000,seeded:true},inc);
       save(); refreshAll(); toast("已从云端同步数据到本机 ✓");
     }else{
       await cloudPush(); toast("已将本机数据上传到云端 ✓");

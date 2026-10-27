@@ -143,6 +143,21 @@
   .hd{font-size:11px;color:var(--sub);text-align:center;padding-bottom:2px;}
   .day{aspect-ratio:1;border-radius:6px;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;}
   .day.empty{background:transparent;}
+  /* 周视图（近 7 天） */
+  .habit-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .hweek-day{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px 7px;border-radius:11px;cursor:pointer;border:1px solid var(--line);background:var(--card);transition:border-color .15s,box-shadow .15s;}
+  .hweek-day:hover{border-color:var(--item-hbd);}
+  .hweek-day.today{border-color:var(--coral);box-shadow:0 0 0 2px rgba(var(--acc-rgb),.14);}
+  .hweek-day .wd{font-size:11px;color:var(--sub);}
+  .hweek-day .wn{font-size:15px;font-weight:700;}
+  .hweek-dot{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:700;}
+  /* 年视图（全年热力图） */
+  .habit-year{display:flex;gap:2.5px;overflow-x:auto;padding:2px 2px 6px;}
+  .hyear-col{display:flex;flex-direction:column;gap:2.5px;flex:0 0 auto;}
+  .hyear-cell{width:11px;height:11px;border-radius:2.5px;background:var(--line);cursor:pointer;transition:transform .1s;}
+  .hyear-cell:hover{transform:scale(1.25);}
+  .hyear-cell.dim{opacity:.28;cursor:default;}
+  .hyear-cell.dim:hover{transform:none;}
   .habits{display:flex;flex-direction:column;gap:9px;}
   .habit{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;}
   .habit .name{font-weight:600;flex:1;}
@@ -507,7 +522,16 @@
   <!-- 习惯 -->
   <section class="sec" id="sec-habit">
     <div class="card">
-      <div class="card-h"><h3>📅 本月打卡日历</h3><span class="sub" id="habitMonth"></span></div>
+      <div class="card-h"><h3>📅 打卡日历</h3>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="sub" id="habitMonth"></span>
+          <div class="seg" id="calViewSeg" style="padding:3px;">
+            <button data-v="month" class="on">月</button>
+            <button data-v="week">周</button>
+            <button data-v="year">年</button>
+          </div>
+        </div>
+      </div>
       <div class="habit-grid" id="habitCalHead"></div>
       <div class="habit-grid" id="habitCal"></div>
       <div style="font-size:12px;color:var(--sub);margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -768,25 +792,74 @@ function renderAccounting(){
 }
 
 /* 习惯 */
+let calView="month"; // 打卡日历视图：month / week / year
+function heatBg(cnt,N){ // 打卡强度 → 颜色
+  if(!(N>0)||cnt<=0) return "var(--line)";
+  if(cnt>=N) return "var(--coral)";
+  if(cnt>=2) return "var(--heat2)";
+  return "var(--heat1)";
+}
 function renderHabits(){
   const t=todayStr();
-  const [Y,M]=todayStr().split("-").map(Number);
-  document.getElementById("habitMonth").textContent=Y+"年"+M+"月";
-  // 日历头
-  document.getElementById("habitCalHead").innerHTML=["日","一","二","三","四","五","六"].map(d=>`<div class="hd">${d}</div>`).join("");
-  const dim=daysInMonth(Y,M);
-  const first=weekday(Y,M,1);
-  let cells="";
-  for(let i=0;i<first;i++) cells+=`<div class="day empty"></div>`;
-  for(let d=1;d<=dim;d++){
-    const ds=Y+"-"+pad(M)+"-"+pad(d);
-    const cnt=state.habits.filter(h=>h.records[ds]).length;
-    let bg="var(--line)",col="#fff";
-    if(cnt>0){ if(cnt>=state.habits.length){bg="var(--coral)";} else if(cnt>=2){bg="var(--heat2)";} else {bg="var(--heat1)";} }
-    const isT=ds===t;
-    cells+=`<div class="day" data-date="${ds}" style="cursor:pointer;background:${bg};${isT?'outline:2px solid var(--coral-d);outline-offset:1px;':''}">${d}</div>`;
+  const [Y,M]=t.split("-").map(Number);
+  const N=state.habits.length;
+  document.getElementById("calViewSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===calView));
+  const head=document.getElementById("habitCalHead"), body=document.getElementById("habitCal");
+  if(calView==="week"){
+    document.getElementById("habitMonth").textContent="近 7 天";
+    head.style.display="none"; body.className="habit-week";
+    let cells="";
+    for(let i=6;i>=0;i--){
+      const ds=addDays(t,-i);
+      const d=parseD(ds);
+      const cnt=state.habits.filter(h=>h.records[ds]).length;
+      const bg=heatBg(cnt,N);
+      cells+=`<div class="hweek-day ${ds===t?'today':''}" data-date="${ds}">
+        <span class="wd">周${"日一二三四五六"[d.getDay()]}</span>
+        <span class="wn">${d.getDate()}</span>
+        <span class="hweek-dot" style="background:${bg};color:${bg==='var(--line)'?'var(--sub)':'#fff'}">${cnt}</span>
+      </div>`;
+    }
+    body.innerHTML=cells;
+  }else if(calView==="year"){
+    document.getElementById("habitMonth").textContent=Y+"年 · 全年热力";
+    head.style.display="none"; body.className="habit-year";
+    const first=new Date(Y,0,1);
+    const cells=[];
+    for(let i=0;i<first.getDay();i++) cells.push(null);
+    for(let m=1;m<=12;m++){ const dim=daysInMonth(Y,m); for(let d=1;d<=dim;d++) cells.push(Y+"-"+pad(m)+"-"+pad(d)); }
+    while(cells.length%7) cells.push(null);
+    let cols="";
+    for(let i=0;i<cells.length;i+=7){
+      cols+='<div class="hyear-col">';
+      for(let j=0;j<7;j++){
+        const ds=cells[i+j];
+        if(!ds){ cols+='<div class="hyear-cell" style="background:transparent;cursor:default"></div>'; continue; }
+        const future=ds>t;
+        const cnt=state.habits.filter(h=>h.records[ds]).length;
+        const [ ,mm,dd]=ds.split("-");
+        cols+=`<div class="hyear-cell ${future?'dim':''}" data-date="${ds}" title="${+mm}月${+dd}日：${cnt}/${N}" style="background:${future?'var(--line)':heatBg(cnt,N)}"></div>`;
+      }
+      cols+="</div>";
+    }
+    body.innerHTML=cols;
+  }else{
+    document.getElementById("habitMonth").textContent=Y+"年"+M+"月";
+    head.style.display="grid"; body.className="habit-grid";
+    head.innerHTML=["日","一","二","三","四","五","六"].map(d=>`<div class="hd">${d}</div>`).join("");
+    const dim=daysInMonth(Y,M);
+    const first=weekday(Y,M,1);
+    let cells="";
+    for(let i=0;i<first;i++) cells+=`<div class="day empty"></div>`;
+    for(let d=1;d<=dim;d++){
+      const ds=Y+"-"+pad(M)+"-"+pad(d);
+      const cnt=state.habits.filter(h=>h.records[ds]).length;
+      const bg=heatBg(cnt,N);
+      const isT=ds===t;
+      cells+=`<div class="day" data-date="${ds}" style="cursor:pointer;background:${bg};${isT?'outline:2px solid var(--coral-d);outline-offset:1px;':''}">${d}</div>`;
+    }
+    body.innerHTML=cells;
   }
-  document.getElementById("habitCal").innerHTML=cells;
   // 习惯列表
   const box=document.getElementById("habitList");
   if(state.habits.length===0){box.innerHTML='<div class="empty">还没有习惯，点「+ 新增」开始</div>';return;}
@@ -1034,8 +1107,14 @@ function bindEvents(){
   document.getElementById("accFKey").addEventListener("input",renderAccounting);
   // 习惯
   document.getElementById("habitAdd").addEventListener("click",openHabitModal);
+  document.getElementById("calViewSeg").addEventListener("click",e=>{
+    const b=e.target.closest("button[data-v]"); if(!b) return;
+    calView=b.dataset.v; renderHabits();
+  });
   document.getElementById("habitCal").addEventListener("click",e=>{
-    const d=e.target.closest("[data-date]"); if(d) openDayModal(d.dataset.date);
+    const d=e.target.closest("[data-date]"); if(!d) return;
+    if(d.dataset.date>todayStr()) return; // 未来日期不可打卡
+    openDayModal(d.dataset.date);
   });
   document.getElementById("habitList").addEventListener("click",e=>{
     const b=e.target.closest("[data-habit]"); if(b){const h=state.habits.find(z=>z.id===b.dataset.habit);if(h){h.records[todayStr()]=!h.records[todayStr()];save();refreshAll();}return;}

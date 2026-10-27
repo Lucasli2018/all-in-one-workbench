@@ -3,7 +3,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>全能工作台</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FF9A76'/%3E%3Cstop offset='1' stop-color='%23F4553C'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Crect x='12' y='12' width='17' height='17' rx='5' fill='white'/%3E%3Crect x='35' y='12' width='17' height='17' rx='5' fill='%23FFE08A'/%3E%3Crect x='12' y='35' width='17' height='17' rx='5' fill='white' opacity='.82'/%3E%3Crect x='35' y='35' width='17' height='17' rx='5' fill='white'/%3E%3C/svg%3E">
 <style>
@@ -39,7 +39,7 @@
     --item-hbg:#F8FAFF; --item-hbd:#CFE3FF;
     --banner-bg:#EFF5FF; --banner-bd:#CBE0FA;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
   html,body{margin:0;padding:0;}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
@@ -112,6 +112,14 @@
   .seg button.on{background:#fff;color:var(--coral-d);box-shadow:0 1px 4px rgba(0,0,0,.06);}
   /* Data list */
   .list{display:flex;flex-direction:column;gap:8px;}
+  /* 记账列表：按月 / 按日折叠头 */
+  .fold-head{display:flex;align-items:center;gap:8px;padding:8px 6px;margin:4px 0 0;cursor:pointer;border-radius:9px;user-select:none;-webkit-user-select:none;transition:background .15s;}
+  .fold-head:hover{background:rgba(var(--acc-rgb),.07);}
+  .fold-head:active{background:rgba(var(--acc-rgb),.13);}
+  .fold-head .fh-chev{flex:0 0 auto;width:14px;text-align:center;font-size:10px;color:var(--sub);}
+  .fold-head .fh-t{font-weight:700;font-size:13.5px;color:var(--ink);}
+  .fold-head.day .fh-t{font-weight:600;font-size:12.5px;color:var(--sub);}
+  .fold-head .fh-s{margin-left:auto;font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap;}
   .item{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;}
   .item .chk{width:22px;height:22px;border-radius:7px;border:2px solid #D8D8DE;flex:0 0 auto;cursor:pointer;display:flex;align-items:center;justify-content:center;}
   .item.done .chk{background:var(--coral);border-color:var(--coral);}
@@ -507,9 +515,15 @@
     <div class="card">
       <div class="card-h"><h3>📈 统计分析</h3>
         <div class="seg" id="statsSeg" style="padding:3px;">
-          <button data-v="trend" class="on">近6月趋势</button>
+          <button data-v="trend" class="on">趋势</button>
           <button data-v="rank">分类排行</button>
         </div>
+      </div>
+      <div class="seg" id="statsPeriodSeg" style="padding:3px;margin:2px 0 12px;">
+        <button data-v="day">日</button>
+        <button data-v="week">周</button>
+        <button data-v="month" class="on">月</button>
+        <button data-v="year">年</button>
       </div>
       <div id="statsBox"></div>
     </div>
@@ -873,7 +887,14 @@ function renderAccounting(){
   const box=document.getElementById("accList");
   document.getElementById("accTotal").textContent="共 "+state.accounts.length+" 条"+(filtered.length!==state.accounts.length?"（已筛选 "+filtered.length+"）":"");
   if(filtered.length===0){box.innerHTML='<div class="empty">没有符合条件的记录</div>';return;}
-  box.innerHTML=filtered.map(a=>`
+  box.innerHTML=renderAccGroupedList(filtered);
+}
+
+/* 记账列表折叠状态（内存态，不持久化）：月 / 日 两级 */
+const accFold={months:{},days:{}};
+const WEEK_CN=["周日","周一","周二","周三","周四","周五","周六"];
+function accItemHTML(a){
+  return `
     <div class="item">
       <div class="body">
         <div class="t1"><span class="cat-dot" style="background:${catColor(a.type,a.category)}"></span>${esc(a.category)} ${a.note?'· '+esc(a.note):''}</div>
@@ -881,11 +902,47 @@ function renderAccounting(){
       </div>
       <button class="del" data-edit="acc" data-id="${a.id}" title="编辑">✎</button>
       <button class="del" data-del="acc" data-id="${a.id}">✕</button>
-    </div>`).join("");
+    </div>`;
+}
+function renderAccGroupedList(list){
+  // 先按月分组，月内按日分组（list 已按日期降序）
+  const months=[],mMap={};
+  list.forEach(a=>{
+    const mk=monthOf(a.date);
+    let g=mMap[mk];
+    if(!g){ g=mMap[mk]={key:mk,income:0,expense:0,count:0,dMap:{},days:[]}; months.push(g); }
+    g.count++; g[a.type==="income"?"income":"expense"]+=a.amount;
+    let d=g.dMap[a.date];
+    if(!d){ d=g.dMap[a.date]={key:a.date,income:0,expense:0,items:[]}; g.days.push(d); }
+    d.items.push(a); d[a.type==="income"?"income":"expense"]+=a.amount;
+  });
+  const sumTxt=(inc,out)=>`${out>0?"支出¥"+fmt(out):""}${inc>0?(out>0?" · ":"")+"收入¥"+fmt(inc):""}`;
+  let html="";
+  months.forEach(gm=>{
+    const mFolded=!!accFold.months[gm.key];
+    html+=`<div class="fold-head" data-foldm="${gm.key}" role="button" tabindex="0" aria-expanded="${!mFolded}">
+      <span class="fh-chev">${mFolded?"▸":"▾"}</span>
+      <span class="fh-t">${gm.key.replace("-","年")}月</span>
+      <span class="fh-s">${gm.count}笔${sumTxt(gm.income,gm.expense)?" · "+sumTxt(gm.income,gm.expense):""}</span>
+    </div>`;
+    if(mFolded) return;
+    gm.days.sort((a,b)=>a.key<b.key?1:-1).forEach(dg=>{
+      const dFolded=!!accFold.days[dg.key];
+      const wd=WEEK_CN[weekday(+dg.key.slice(0,4),+dg.key.slice(5,7),+dg.key.slice(8,10))];
+      html+=`<div class="fold-head day" data-foldd="${dg.key}" role="button" tabindex="0" aria-expanded="${!dFolded}">
+        <span class="fh-chev">${dFolded?"▸":"▾"}</span>
+        <span class="fh-t">${+dg.key.slice(5,7)}月${+dg.key.slice(8,10)}日 ${wd}</span>
+        <span class="fh-s">${dg.items.length}笔${sumTxt(dg.income,dg.expense)?" · "+sumTxt(dg.income,dg.expense):""}</span>
+      </div>`;
+      if(!dFolded) html+=dg.items.map(accItemHTML).join("");
+    });
+  });
+  return html;
 }
 
-/* 统计分析（近6月趋势 / 分类排行） */
+/* 统计分析（趋势 / 分类排行 × 日/周/月/年 周期） */
 let statsView="trend";
+let statsPeriod="month"; // day / week / month / year
 function shortNum(n){ return n>=10000?(n/10000).toFixed(1)+"w":String(Math.round(n)); }
 function last6Months(){
   const [Y,M]=todayStr().split("-").map(Number);
@@ -893,16 +950,37 @@ function last6Months(){
   for(let i=5;i>=0;i--){ const d=new Date(Y,M-1-i,1); arr.push(d.getFullYear()+"-"+pad(d.getMonth()+1)); }
   return arr;
 }
+// 周起始（周一）
+function weekStart(s){ const d=parseD(s); const w=(d.getDay()+6)%7; d.setDate(d.getDate()-w); return dstr(d); }
+// 某周期下最近 n 个桶的 key（升序）
+function periodKeys(period,n=6){
+  const t=todayStr(); const arr=[];
+  if(period==="day"){ for(let i=n-1;i>=0;i--) arr.push(addDays(t,-i)); }
+  else if(period==="week"){ const ws=weekStart(t); for(let i=n-1;i>=0;i--) arr.push(addDays(ws,-7*i)); }
+  else if(period==="month"){ arr.push(...last6Months()); }
+  else { const Y=+t.slice(0,4); for(let i=n-1;i>=0;i--) arr.push(String(Y-i)); }
+  return arr;
+}
+// 记录日期是否落在某周期的桶内
+function inPeriod(dateStr,key,period){
+  if(period==="day") return dateStr===key;
+  if(period==="week") return weekStart(dateStr)===key;
+  if(period==="month") return monthOf(dateStr)===key;
+  return dateStr.slice(0,4)===key;
+}
+const PERIOD_LABEL={day:"今日",week:"本周",month:"本月",year:"今年"};
 function renderStats(){
   const seg=document.getElementById("statsSeg"); if(!seg) return;
   seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===statsView));
+  const pseg=document.getElementById("statsPeriodSeg");
+  if(pseg) pseg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===statsPeriod));
   const box=document.getElementById("statsBox");
-  box.innerHTML=statsView==="trend"?trendChart():rankBars();
+  box.innerHTML=statsView==="trend"?trendChart(statsPeriod):rankBars(statsPeriod);
 }
-function trendChart(){
-  const data=last6Months().map(m=>{
-    const list=state.accounts.filter(a=>monthOf(a.date)===m);
-    return { m,
+function trendChart(period){
+  const data=periodKeys(period,period==="day"?7:6).map(k=>{
+    const list=state.accounts.filter(a=>inPeriod(a.date,k,period));
+    return { k,
       inc:list.filter(a=>a.type==="income").reduce((s,a)=>s+a.amount,0),
       out:list.filter(a=>a.type==="expense").reduce((s,a)=>s+a.amount,0) };
   });
@@ -921,22 +999,26 @@ function trendChart(){
     const hi=plotH*(d.inc/max), ho=plotH*(d.out/max);
     svg+=`<rect x="${(cx-bw-2).toFixed(1)}" y="${(H-bottom-Math.max(hi,1)).toFixed(1)}" width="${bw}" height="${Math.max(hi,1).toFixed(1)}" rx="3" fill="var(--green)"/>`;
     svg+=`<rect x="${(cx+2).toFixed(1)}" y="${(H-bottom-Math.max(ho,1)).toFixed(1)}" width="${bw}" height="${Math.max(ho,1).toFixed(1)}" rx="3" fill="var(--coral)"/>`;
-    svg+=`<text x="${cx.toFixed(1)}" y="${H-8}" font-size="9" fill="var(--sub)" text-anchor="middle">${d.m.slice(2).replace("-","/")}</text>`;
+    const label=period==="year"?d.k:d.k.slice(2).replace("-","/");
+    svg+=`<text x="${cx.toFixed(1)}" y="${H-8}" font-size="9" fill="var(--sub)" text-anchor="middle">${label}</text>`;
     if(d.inc>0) svg+=`<text x="${(cx-bw/2-2).toFixed(1)}" y="${(H-bottom-hi-4).toFixed(1)}" font-size="8" fill="var(--green)" text-anchor="middle">${shortNum(d.inc)}</text>`;
     if(d.out>0) svg+=`<text x="${(cx+bw/2+2).toFixed(1)}" y="${(H-bottom-ho-4).toFixed(1)}" font-size="8" fill="var(--coral-d)" text-anchor="middle">${shortNum(d.out)}</text>`;
   });
+  const cap={day:"近 7 日",week:"近 6 周",month:"近 6 月",year:"近 6 年"}[period]||"";
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:480px;display:block;margin:0 auto;">${svg}</svg>
     <div style="font-size:11px;color:var(--sub);display:flex;gap:14px;justify-content:center;margin-top:2px;">
       <span><span class="cat-dot" style="background:var(--green)"></span>收入</span>
       <span><span class="cat-dot" style="background:var(--coral)"></span>支出</span>
+      <span style="opacity:.75;">（${cap}）</span>
     </div>`;
 }
-function rankBars(){
-  const m=monthOf(todayStr());
+function rankBars(period){
+  const t=todayStr();
+  const key=period==="day"?t:(period==="week"?weekStart(t):(period==="month"?monthOf(t):t.slice(0,4)));
   const byCat={};
-  state.accounts.filter(a=>a.type==="expense"&&monthOf(a.date)===m).forEach(a=>{byCat[a.category]=(byCat[a.category]||0)+a.amount;});
+  state.accounts.filter(a=>a.type==="expense"&&inPeriod(a.date,key,period)).forEach(a=>{byCat[a.category]=(byCat[a.category]||0)+a.amount;});
   const entries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
-  if(!entries.length) return '<div class="empty">本月暂无支出</div>';
+  if(!entries.length) return `<div class="empty">${PERIOD_LABEL[period]}暂无支出</div>`;
   const total=entries.reduce((s,e)=>s+e[1],0);
   const max=entries[0][1];
   return entries.map(([cat,val])=>`
@@ -950,7 +1032,7 @@ function rankBars(){
         <div style="height:100%;width:${Math.max(3,val/max*100).toFixed(1)}%;background:${catColor('expense',cat)};border-radius:999px;"></div>
       </div>
     </div>`).join("")+
-    `<div style="font-size:11px;color:var(--sub);margin-top:2px;">本月支出合计 ¥${fmt(total)}</div>`;
+    `<div style="font-size:11px;color:var(--sub);margin-top:2px;">${PERIOD_LABEL[period]}支出合计 ¥${fmt(total)}</div>`;
 }
 
 /* 习惯 */
@@ -1310,6 +1392,10 @@ function bindEvents(){
     const b=e.target.closest("button[data-v]"); if(!b) return;
     statsView=b.dataset.v; renderStats();
   });
+  document.getElementById("statsPeriodSeg").addEventListener("click",e=>{
+    const b=e.target.closest("button[data-v]"); if(!b) return;
+    statsPeriod=b.dataset.v; renderStats();
+  });
   document.getElementById("tplMgr").addEventListener("click",openTplModal);
   // 习惯
   document.getElementById("habitAdd").addEventListener("click",openHabitModal);
@@ -1342,8 +1428,12 @@ function bindEvents(){
     const ed=e.target.closest("[data-edit='fit']"); if(ed){editFitness(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='fit']"); if(d){state.fitness=state.fitness.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
-  // 删除记账（事件委托到 accList）
+  // 删除记账（事件委托到 accList）；折叠头：先处理月/日折叠
   document.getElementById("accList").addEventListener("click",e=>{
+    const fm=e.target.closest("[data-foldm]");
+    if(fm){ accFold.months[fm.dataset.foldm]=!accFold.months[fm.dataset.foldm]; renderAccounting(); return; }
+    const fd=e.target.closest("[data-foldd]");
+    if(fd){ accFold.days[fd.dataset.foldd]=!accFold.days[fd.dataset.foldd]; renderAccounting(); return; }
     const ed=e.target.closest("[data-edit='acc']"); if(ed){editAccount(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='acc']"); if(d){state.accounts=state.accounts.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
@@ -1355,6 +1445,9 @@ function bindEvents(){
   // modal close
   document.getElementById("mask").addEventListener("click",e=>{if(e.target.id==="mask")closeModal();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+  // 全面禁用双击放大（touch-action:manipulation 为主，这里兜底拦截双击/多指缩放）
+  document.addEventListener("dblclick",e=>e.preventDefault(),{passive:false});
+  document.addEventListener("gesturestart",e=>e.preventDefault(),{passive:false});
 }
 function addAccountModal(){
   document.getElementById("modalBox").innerHTML=`

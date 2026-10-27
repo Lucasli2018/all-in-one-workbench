@@ -203,12 +203,22 @@
   .db-btn.danger:hover{background:rgba(217,83,79,.16);}
   .db-hint{font-size:11px;color:var(--sub);line-height:1.5;margin:9px 0 0;}
 
+  /* 抽屉内「云端账户」区 */
+  .drawer-account{margin-top:14px;padding:12px 8px 0;border-top:1px solid rgba(0,0,0,.06);}
+  .da-user{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .da-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--coral),#FF9A6B);color:#fff;font-weight:800;font-size:16px;display:grid;place-items:center;flex:0 0 auto;}
+  .da-info{flex:1;min-width:0;}
+  .da-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .da-sub{font-size:11px;color:var(--sub);}
+  .da-actions{display:grid;gap:6px;}
+
   /* 桌面收缩态：折叠为仅图标栏 */
   .drawer.collapsed{width:var(--drawer-w-collapsed);padding-left:10px;padding-right:10px;}
   .drawer.collapsed .dl-txt,
   .drawer.collapsed .di-label,
   .drawer.collapsed .drawer-foot,
-  .drawer.collapsed .drawer-backup{display:none;}
+  .drawer.collapsed .drawer-backup,
+  .drawer.collapsed .drawer-account{display:none;}
   .drawer.collapsed .drawer-logo{flex-direction:column;justify-content:center;gap:6px;padding:6px 0 12px;}
   .drawer.collapsed .drawer-item{justify-content:center;padding:13px 0;gap:0;}
 
@@ -284,6 +294,9 @@
       <span class="di-label">减脂</span>
     </button>
   </nav>
+
+  <!-- 云端账户（登录 / 注册 / 同步） -->
+  <div class="drawer-account" id="drawerAccount"></div>
 
   <!-- 数据备份（原首页底部卡片，收纳进抽屉） -->
   <div class="drawer-backup">
@@ -464,6 +477,7 @@ function save(){
   localStorage.setItem(KEYS.budget,String(state.budget));
   localStorage.setItem(KEYS.seeded,"1");
   checkBackupHint();
+  scheduleCloudPush();
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 
@@ -1160,14 +1174,179 @@ function clearSample(){
   save();seed();refreshAll();
 }
 
+/* ============ 云端同步（Cloudflare Pages Functions + D1，表前缀 wba_） ============ */
+const CLOUD_KEY=PREFIX+"cloud";
+let CLOUD={on:false,user:null,auto:true,syncing:false,lastErr:""};
+let _pushTimer=null;
+function cloudLoad(){try{const o=JSON.parse(localStorage.getItem(CLOUD_KEY)||"{}");CLOUD.user=o.user||null;CLOUD.auto=o.auto!==false;}catch(e){}}
+function cloudStore(){try{localStorage.setItem(CLOUD_KEY,JSON.stringify({user:CLOUD.user,auto:CLOUD.auto}));}catch(e){}}
+function cloudOnline(){return CLOUD.on && (typeof navigator==="undefined"||navigator.onLine!==false);}
+async function apiFetch(path,opts={}){
+  let r;
+  try{ r=await fetch(path,Object.assign({credentials:"same-origin",headers:{"content-type":"application/json"}},opts)); }
+  catch(e){ throw new Error("NETWORK"); }
+  if(!r.ok){
+    let e=null; try{ e=await r.json(); }catch(_){}
+    if(r.status===401) CLOUD.on=false;
+    throw new Error((e&&e.error)||("HTTP "+r.status));
+  }
+  return r.json();
+}
+// 启动探测：200 = 已登录（带会话）；401 = 未登录；404 / 网络 = 纯本地模式
+async function bootCloud(){
+  try{
+    const r=await fetch("/api/me",{credentials:"same-origin"});
+    if(r.status===200){ CLOUD.on=true; const d=await r.json(); if(d.user&&d.user.email) CLOUD.user=d.user.email; cloudStore(); }
+    else if(r.status===401){ CLOUD.on=false; CLOUD.user=null; cloudStore(); } // 会话失效
+    else CLOUD.on=false; // 无后端 / 其他异常：保留 cloudUser 供离线展示
+  }catch(e){ CLOUD.on=false; }
+  buildAccountArea(); updateSyncPill();
+}
+async function cloudRegister(email,pw){
+  const d=await apiFetch("/api/auth/register",{method:"POST",body:JSON.stringify({email,pw})});
+  CLOUD.on=true; CLOUD.user=d.user.email; cloudStore(); return d;
+}
+async function cloudLogin(email,pw){
+  const d=await apiFetch("/api/auth/login",{method:"POST",body:JSON.stringify({email,pw})});
+  CLOUD.on=true; CLOUD.user=d.user.email; cloudStore(); return d;
+}
+async function cloudLogout(){
+  try{ await apiFetch("/api/auth/logout",{method:"POST"}); }catch(e){}
+  CLOUD.user=null; cloudStore(); buildAccountArea(); updateSyncPill();
+}
+// 本地 → 云端：整包覆盖
+async function cloudPush(){
+  if(!cloudOnline()) throw new Error("离线或云端不可用");
+  CLOUD.syncing=true;
+  try{
+    await apiFetch("/api/me",{method:"PUT",body:JSON.stringify({data:state})});
+    CLOUD.lastErr=""; return true;
+  }catch(e){ CLOUD.lastErr=String((e&&e.message)||e); throw e; }
+  finally{ CLOUD.syncing=false; updateSyncPill(); }
+}
+// 云端 → 本地：整包覆盖（替换本机 state）
+async function cloudPull(){
+  if(!cloudOnline()) throw new Error("离线或云端不可用");
+  CLOUD.syncing=true;
+  try{
+    const d=await apiFetch("/api/me");
+    const inc=d.data||{};
+    state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],budget:3000,seeded:true},inc);
+    save(); refreshAll(); CLOUD.lastErr=""; return true;
+  }catch(e){ CLOUD.lastErr=String((e&&e.message)||e); throw e; }
+  finally{ CLOUD.syncing=false; }
+}
+// 登录后首同步：云端有数据则拉取覆盖，否则上传本机
+async function afterLoginSync(){
+  try{
+    const d=await apiFetch("/api/me");
+    const inc=d.data||{};
+    const hasData=(inc.todos&&inc.todos.length)||(inc.accounts&&inc.accounts.length)||(inc.habits&&inc.habits.length)||(inc.fitness&&inc.fitness.length);
+    if(hasData){
+      state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],budget:3000,seeded:true},inc);
+      save(); refreshAll(); toast("已从云端同步数据到本机 ✓");
+    }else{
+      await cloudPush(); toast("已将本机数据上传到云端 ✓");
+    }
+  }catch(e){ toast("登录成功，但同步失败："+(e.message||e),true); }
+}
+// 改动后防抖自动上传
+function scheduleCloudPush(){
+  if(!CLOUD.on||!CLOUD.user||!CLOUD.auto) return;
+  if(_pushTimer) clearTimeout(_pushTimer);
+  _pushTimer=setTimeout(()=>{ cloudPush().then(()=>updateSyncPill()).catch(()=>{}); },1000);
+}
+function updateSyncPill(){
+  const t=document.getElementById("syncText"); if(!t) return;
+  const dot=document.querySelector(".sync .dot");
+  if(CLOUD.user){ t.textContent="已同步云端"; if(dot) dot.style.background="#9CF0C2"; }
+  else{ t.textContent="本地存储"; if(dot) dot.style.background=""; }
+}
+function buildAccountArea(){
+  const el=document.getElementById("drawerAccount"); if(!el) return;
+  if(CLOUD.user){
+    el.innerHTML=`<div class="da-user">
+        <div class="da-avatar">${esc(CLOUD.user.slice(0,1).toUpperCase())}</div>
+        <div class="da-info"><div class="da-name">${esc(CLOUD.user)}</div><div class="da-sub">${CLOUD.on?"已连接云端":"未连接"}</div></div>
+      </div>
+      <div class="da-actions">
+        <button class="db-btn" id="daSync">☁ 同步到云端</button>
+        <button class="db-btn" id="daPull">⬇ 从云端同步</button>
+        <button class="db-btn" id="daAuto">${CLOUD.auto?"✓ 自动同步：开":"○ 自动同步：关"}</button>
+        <button class="db-btn danger" id="daLogout">退出登录</button>
+      </div>`;
+    el.querySelector("#daSync").onclick=async()=>{ try{ await cloudPush(); toast("已同步到云端 ✓"); }catch(e){ toast("同步失败："+(e.message||e),true); } };
+    el.querySelector("#daPull").onclick=async()=>{
+      if(!confirm("用云端数据覆盖本机全部数据？本机未上传的改动将丢失。")) return;
+      try{ await cloudPull(); toast("已从云端同步到本机 ✓"); }catch(e){ toast("同步失败："+(e.message||e),true); }
+    };
+    el.querySelector("#daAuto").onclick=()=>{ CLOUD.auto=!CLOUD.auto; cloudStore(); buildAccountArea(); toast(CLOUD.auto?"已开启自动同步":"已关闭自动同步"); };
+    el.querySelector("#daLogout").onclick=async()=>{ await cloudLogout(); toast("已退出登录"); };
+  }else{
+    el.innerHTML=`<button class="db-btn" id="daLogin" style="background:rgba(255,122,89,.14);font-weight:700;">☁ 登录 / 注册（多设备同步）</button>`;
+    el.querySelector("#daLogin").onclick=openCloudPanel;
+  }
+}
+function openCloudPanel(){
+  const box=document.getElementById("modalBox");
+  if(CLOUD.user){ closeModal(); return; }
+  box.innerHTML=`
+    <div class="modal-h"><h3>☁ 登录 / 注册</h3><button class="modal-x" id="clClose">关闭</button></div>
+    <p style="font-size:13px;color:var(--sub);margin:0 0 12px;">注册一个云端账号，多设备同步你的工作台数据（数据存于你自己的 Cloudflare D1 数据库，表前缀 wba_）。</p>
+    <div class="field"><label>邮箱</label><input id="clEmail" type="email" autocomplete="username" placeholder="you@example.com"></div>
+    <div class="field"><label>密码（至少 6 位）</label><input id="clPw" type="password" autocomplete="current-password" placeholder="设置密码"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-primary" id="clReg" style="margin-top:0;flex:1;">注册</button>
+      <button class="btn-primary" id="clLogin" style="margin-top:0;flex:1;background:var(--coral-d);">登录</button>
+    </div>
+    <div id="clStatus" style="font-size:12px;margin-top:10px;min-height:16px;"></div>`;
+  box.querySelector("#clClose").onclick=closeModal;
+  const emailEl=box.querySelector("#clEmail"),pwEl=box.querySelector("#clPw"),statusEl=box.querySelector("#clStatus");
+  const submit=async(mode)=>{
+    const email=emailEl.value.trim(),pw=pwEl.value;
+    if(!/^\S+@\S+\.\S+$/.test(email)){ statusEl.textContent="请输入有效的邮箱"; statusEl.style.color="var(--red)"; return; }
+    if(!pw||pw.length<6){ statusEl.textContent="密码至少 6 位"; statusEl.style.color="var(--red)"; return; }
+    statusEl.textContent=mode==="reg"?"正在注册…":"正在登录…"; statusEl.style.color="var(--sub)";
+    try{
+      if(mode==="reg") await cloudRegister(email,pw); else await cloudLogin(email,pw);
+      statusEl.textContent="登录成功 ✓"; statusEl.style.color="var(--green)";
+      await afterLoginSync();
+      closeModal(); buildAccountArea(); updateSyncPill();
+    }catch(e){ statusEl.textContent=(mode==="reg"?"注册":"登录")+"失败："+(e.message||e); statusEl.style.color="var(--red)"; }
+  };
+  box.querySelector("#clReg").onclick=()=>submit("reg");
+  box.querySelector("#clLogin").onclick=()=>submit("login");
+  pwEl.addEventListener("keydown",e=>{ if(e.key==="Enter") submit("login"); });
+  openModal();
+  setTimeout(()=>{ const el=document.getElementById("clEmail"); if(el) el.focus(); },50);
+}
+function toast(msg,isErr){
+  let t=document.getElementById("wbToast");
+  if(!t){
+    t=document.createElement("div"); t.id="wbToast";
+    t.style.cssText="position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:80;background:rgba(43,43,51,.94);color:#fff;font-size:13px;padding:9px 14px;border-radius:10px;max-width:88vw;box-shadow:0 6px 20px rgba(0,0,0,.2);transition:opacity .25s;pointer-events:none;text-align:center;";
+    document.body.appendChild(t);
+  }
+  t.textContent=msg; t.style.background=isErr?"rgba(200,64,60,.95)":"rgba(43,43,51,.94)"; t.style.opacity="1";
+  clearTimeout(t._tm); t._tm=setTimeout(()=>{ t.style.opacity="0"; },2200);
+}
+window.addEventListener("online",()=>{ const b=document.getElementById("offlineBanner"); if(b) b.style.display="none"; if(CLOUD.on&&CLOUD.auto) scheduleCloudPush(); });
+window.addEventListener("offline",()=>{ const b=document.getElementById("offlineBanner"); if(b) b.style.display="block"; });
+
 /* ============ 初始化 ============ */
 window.addEventListener("DOMContentLoaded",()=>{
   navCollapsed = !!getNav().collapsed;
+  cloudLoad();
   loadAll();
   seed();
   bindEvents();
   applyNav();
   refreshAll();
+  buildAccountArea();
+  bootCloud();
+  if(typeof navigator!=="undefined" && navigator.onLine===false){
+    const b=document.getElementById("offlineBanner"); if(b) b.style.display="block";
+  }
 });
 </script>
 </body>

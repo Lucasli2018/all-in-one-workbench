@@ -475,7 +475,7 @@ function save(){
   localStorage.setItem(KEYS.habits,JSON.stringify(state.habits));
   localStorage.setItem(KEYS.fitness,JSON.stringify(state.fitness));
   localStorage.setItem(KEYS.budget,String(state.budget));
-  localStorage.setItem(KEYS.seeded,"1");
+  localStorage.setItem(KEYS.seeded,state.seeded?"1":"0");
   checkBackupHint();
   scheduleCloudPush();
 }
@@ -1167,11 +1167,17 @@ function importJSON(e){
   r.readAsText(f);e.target.value="";
 }
 function clearSample(){
-  if(!confirm("确定清空所有数据（含示例）吗？此操作不可恢复，建议先导出备份。"))return;
-  state.todos=[];state.accounts=[];state.habits=[];state.fitness=[];
-  state.seeded=false;
-  localStorage.removeItem(KEYS.seeded);
-  save();seed();refreshAll();
+  confirmModal({
+    title:"🗑 清空全部数据",
+    msg:"将清空<strong>记账 / 习惯 / 待办 / 减脂的所有数据（含示例）</strong>，此操作不可恢复，建议先在下方「导出 JSON 备份」。",
+    okText:"确认清空", danger:true,
+    onOk:()=>{
+      state.todos=[];state.accounts=[];state.habits=[];state.fitness=[];
+      state.seeded=true; /* 清空后置为已播种，避免下次进入又种回示例数据 */
+      save();refreshAll();
+      toast("已清空全部数据");
+    }
+  });
 }
 
 /* ============ 云端同步（Cloudflare Pages Functions + D1，表前缀 wba_） ============ */
@@ -1224,7 +1230,7 @@ async function cloudPush(){
   }catch(e){ CLOUD.lastErr=String((e&&e.message)||e); throw e; }
   finally{ CLOUD.syncing=false; updateSyncPill(); }
 }
-// 云端 → 本地：整包覆盖（替换本机 state）
+// 云端 → 本地：整包覆盖（替换本机 state）；返回拉到的记录条数
 async function cloudPull(){
   if(!cloudOnline()) throw new Error("离线或云端不可用");
   CLOUD.syncing=true;
@@ -1232,7 +1238,9 @@ async function cloudPull(){
     const d=await apiFetch("/api/me");
     const inc=d.data||{};
     state=Object.assign({todos:[],accounts:[],habits:[],fitness:[],budget:3000,seeded:true},inc);
-    save(); refreshAll(); CLOUD.lastErr=""; return true;
+    save(); refreshAll(); CLOUD.lastErr="";
+    const n=(inc.todos?inc.todos.length:0)+(inc.accounts?inc.accounts.length:0)+(inc.habits?inc.habits.length:0)+(inc.fitness?inc.fitness.length:0);
+    return n;
   }catch(e){ CLOUD.lastErr=String((e&&e.message)||e); throw e; }
   finally{ CLOUD.syncing=false; }
 }
@@ -1250,8 +1258,9 @@ async function afterLoginSync(){
     }
   }catch(e){ toast("登录成功，但同步失败："+(e.message||e),true); }
 }
-// 改动后防抖自动上传
+// 改动后防抖自动上传（拉取过程中/拉取后的保存不回推，避免覆盖云端造成「从云端同步无效」）
 function scheduleCloudPush(){
+  if(CLOUD.syncing) return;
   if(!CLOUD.on||!CLOUD.user||!CLOUD.auto) return;
   if(_pushTimer) clearTimeout(_pushTimer);
   _pushTimer=setTimeout(()=>{ cloudPush().then(()=>updateSyncPill()).catch(()=>{}); },1000);
@@ -1275,10 +1284,26 @@ function buildAccountArea(){
         <button class="db-btn" id="daAuto">${CLOUD.auto?"✓ 自动同步：开":"○ 自动同步：关"}</button>
         <button class="db-btn danger" id="daLogout">退出登录</button>
       </div>`;
-    el.querySelector("#daSync").onclick=async()=>{ try{ await cloudPush(); toast("已同步到云端 ✓"); }catch(e){ toast("同步失败："+(e.message||e),true); } };
-    el.querySelector("#daPull").onclick=async()=>{
-      if(!confirm("用云端数据覆盖本机全部数据？本机未上传的改动将丢失。")) return;
-      try{ await cloudPull(); toast("已从云端同步到本机 ✓"); }catch(e){ toast("同步失败："+(e.message||e),true); }
+    el.querySelector("#daSync").onclick=()=>{
+      confirmModal({
+        title:"☁ 同步到云端",
+        msg:"将把<strong>本机当前全部数据上传并覆盖云端副本</strong>。确定继续吗？",
+        okText:"开始上传",
+        onOk:async()=>{ try{ await cloudPush(); toast("已同步到云端 ✓"); }catch(e){ toast("同步失败："+(e.message||e),true); } }
+      });
+    };
+    el.querySelector("#daPull").onclick=()=>{
+      confirmModal({
+        title:"⬇ 从云端同步",
+        msg:"将用<strong>云端数据覆盖本机全部数据</strong>，本机未上传的改动将丢失。确定继续吗？",
+        okText:"开始同步",
+        onOk:async()=>{
+          try{
+            const n=await cloudPull();
+            toast(n>0?("已从云端同步 "+n+" 条数据到本机 ✓"):"云端暂无数据，本机保持不变");
+          }catch(e){ toast("同步失败："+(e.message||e),true); }
+        }
+      });
     };
     el.querySelector("#daAuto").onclick=()=>{ CLOUD.auto=!CLOUD.auto; cloudStore(); buildAccountArea(); toast(CLOUD.auto?"已开启自动同步":"已关闭自动同步"); };
     el.querySelector("#daLogout").onclick=async()=>{ await cloudLogout(); toast("已退出登录"); };
@@ -1329,6 +1354,21 @@ function toast(msg,isErr){
   }
   t.textContent=msg; t.style.background=isErr?"rgba(200,64,60,.95)":"rgba(43,43,51,.94)"; t.style.opacity="1";
   clearTimeout(t._tm); t._tm=setTimeout(()=>{ t.style.opacity="0"; },2200);
+}
+/* 应用内二次确认弹框（替代原生 confirm，内嵌 webview 中原生对话框会被拦截导致按钮失效） */
+function confirmModal(opt){
+  const box=document.getElementById("modalBox");
+  box.innerHTML=`
+    <div class="modal-h"><h3>${opt.title||"确认操作"}</h3><button class="modal-x" id="cmX" aria-label="关闭">关闭</button></div>
+    <p style="font-size:13.5px;color:var(--ink);line-height:1.8;margin:0 0 14px;">${opt.msg||""}</p>
+    <div style="display:flex;gap:8px;">
+      <button class="ic-btn" id="cmCancel" style="flex:1;background:#F1F2F5;color:var(--sub);">取消</button>
+      <button class="btn-primary" id="cmOk" style="flex:1;margin-top:0;${opt.danger?"background:#D9554F;box-shadow:0 8px 18px rgba(217,83,79,.28);":""}">${opt.okText||"确认"}</button>
+    </div>`;
+  document.getElementById("cmX").addEventListener("click",closeModal);
+  document.getElementById("cmCancel").addEventListener("click",closeModal);
+  document.getElementById("cmOk").addEventListener("click",()=>{ closeModal(); if(opt.onOk) opt.onOk(); });
+  openModal();
 }
 window.addEventListener("online",()=>{ const b=document.getElementById("offlineBanner"); if(b) b.style.display="none"; if(CLOUD.on&&CLOUD.auto) scheduleCloudPush(); });
 window.addEventListener("offline",()=>{ const b=document.getElementById("offlineBanner"); if(b) b.style.display="block"; });

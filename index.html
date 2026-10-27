@@ -68,6 +68,11 @@
   .card-h h3{margin:0;font-size:16px;display:flex;align-items:center;gap:7px;}
   .card-h .sub{font-size:12px;color:var(--sub);}
   .ic-btn{border:none;background:var(--coral-l);color:var(--coral-d);font-weight:600;font-size:13px;padding:7px 12px;border-radius:9px;cursor:pointer;min-height:38px;}
+  /* 卡片头部「新增」图标按钮 */
+  .add-ic{width:36px;height:36px;border:none;background:var(--coral-l);color:var(--coral-d);border-radius:11px;cursor:pointer;display:grid;place-items:center;flex:0 0 auto;transition:background .15s,transform .1s;}
+  .add-ic:active{background:#FFD9CD;transform:scale(.94);}
+  .add-ic svg{width:20px;height:20px;}
+  .card-h .add-ic{margin-left:8px;}
   /* Forms */
   .field{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
   .field label{font-size:13px;color:var(--sub);font-weight:600;}
@@ -343,21 +348,14 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-h"><h3>➕ 记一笔</h3></div>
-      <div class="seg" id="accType">
-        <button class="on" data-v="expense">支出</button>
-        <button data-v="income">收入</button>
+      <div class="card-h"><h3>📜 最近记录</h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="sub" id="accTotal"></span>
+          <button class="add-ic" id="accAddBtn" aria-label="记一笔" title="记一笔">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
+        </div>
       </div>
-      <div class="row" style="margin-top:11px;">
-        <div class="field"><label>金额 (¥)</label><input type="number" id="accAmount" placeholder="0.00" min="0" step="0.01"></div>
-        <div class="field"><label>分类</label><select id="accCat"></select></div>
-      </div>
-      <div class="field"><label>日期</label><input type="date" id="accDate"></div>
-      <div class="field"><label>备注</label><input type="text" id="accNote" placeholder="选填"></div>
-      <button class="btn-primary" id="accAdd">保存记录</button>
-    </div>
-    <div class="card">
-      <div class="card-h"><h3>📜 最近记录</h3><span class="sub" id="accTotal"></span></div>
       <div class="filter-bar" id="accFilterBar">
         <select id="accFMonth"><option value="">全部分月</option></select>
         <select id="accFCat"><option value="">全部分类</option></select>
@@ -384,7 +382,11 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-h"><h3>✅ 我的习惯</h3><button class="ic-btn" id="habitAdd">+ 新增</button></div>
+      <div class="card-h"><h3>✅ 我的习惯</h3>
+        <button class="add-ic" id="habitAdd" aria-label="新增习惯" title="新增习惯">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+      </div>
       <div class="habits" id="habitList"></div>
     </div>
   </section>
@@ -392,18 +394,14 @@
   <!-- 待办 -->
   <section class="sec" id="sec-todo">
     <div class="card">
-      <div class="card-h"><h3>🎯 添加待办</h3><span class="sub" id="todoRate"></span></div>
-      <div class="field"><label>事项</label><input type="text" id="todoTitle" placeholder="今天要做什么？"></div>
-      <div class="row">
-        <div class="field"><label>日期</label><input type="date" id="todoDate"></div>
-        <div class="field"><label>优先级</label>
-          <select id="todoPri"><option value="P0">P0 紧急</option><option value="P1" selected>P1 重要</option><option value="P2">P2 普通</option></select>
+      <div class="card-h"><h3>📋 待办清单</h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="sub" id="todoRate">点击圆圈完成</span>
+          <button class="add-ic" id="todoAddBtn" aria-label="添加待办" title="添加待办">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
         </div>
       </div>
-      <button class="btn-primary" id="todoAdd">添加待办</button>
-    </div>
-    <div class="card">
-      <div class="card-h"><h3>📋 待办清单</h3><span class="sub">点击圆圈完成</span></div>
       <div class="list" id="todoList"></div>
     </div>
   </section>
@@ -415,17 +413,11 @@
       <div id="fitChart" style="width:100%;overflow-x:auto;"></div>
     </div>
     <div class="card">
-      <div class="card-h"><h3>⚖️ 记录今日</h3></div>
-      <div class="row">
-        <div class="field"><label>体重 (kg)</label><input type="number" id="fitWeight" placeholder="60.0" min="0" step="0.1"></div>
-        <div class="field"><label>体脂 (%)</label><input type="number" id="fitFat" placeholder="选填" min="0" step="0.1"></div>
+      <div class="card-h"><h3>🏃 历史记录</h3>
+        <button class="add-ic" id="fitAddBtn" aria-label="记录体重" title="记录体重">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
       </div>
-      <div class="field"><label>日期</label><input type="date" id="fitDate"></div>
-      <div class="field"><label>运动 / 备注</label><input type="text" id="fitNote" placeholder="如：跑步5km / 力量训练"></div>
-      <button class="btn-primary" id="fitAdd">保存记录</button>
-    </div>
-    <div class="card">
-      <div class="card-h"><h3>🏃 历史记录</h3></div>
       <div class="list" id="fitList"></div>
     </div>
   </section>
@@ -877,14 +869,8 @@ function bindEvents(){
   window.addEventListener("resize",applyNav);
   // 今天要处理：顶栏图标 → 弹框（列表内「完成」在弹框渲染时绑定）
   document.getElementById("todayBtn").addEventListener("click",openTodayModal);
-  // 记账类型切换
-  document.querySelectorAll("#accType button").forEach(b=>b.addEventListener("click",()=>{
-    document.querySelectorAll("#accType button").forEach(x=>x.classList.remove("on"));
-    b.classList.add("on"); fillCatOptions(b.dataset.v);
-  }));
-  fillCatOptions("expense");
-  document.getElementById("accDate").value=todayStr();
-  document.getElementById("accAdd").addEventListener("click",addAccount);
+  // 记账：点击 + 图标 → 弹框录入
+  document.getElementById("accAddBtn").addEventListener("click",addAccountModal);
   document.getElementById("accEditBudget").addEventListener("click",editBudget);
   document.getElementById("accFMonth").addEventListener("change",renderAccounting);
   document.getElementById("accFCat").addEventListener("change",renderAccounting);
@@ -899,17 +885,15 @@ function bindEvents(){
     const ed=e.target.closest("[data-edit='habit']"); if(ed){editHabit(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='habit']"); if(d){state.habits=state.habits.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
-  // 待办
-  document.getElementById("todoDate").value=todayStr();
-  document.getElementById("todoAdd").addEventListener("click",addTodo);
+  // 待办：点击 + 图标 → 弹框录入
+  document.getElementById("todoAddBtn").addEventListener("click",addTodoModal);
   document.getElementById("todoList").addEventListener("click",e=>{
     const c=e.target.closest("[data-chk]"); if(c){const x=state.todos.find(z=>z.id===c.dataset.chk);if(x){x.done=!x.done;save();refreshAll();}return;}
     const ed=e.target.closest("[data-edit='todo']"); if(ed){editTodo(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='todo']"); if(d){state.todos=state.todos.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
   });
-  // 减脂
-  document.getElementById("fitDate").value=todayStr();
-  document.getElementById("fitAdd").addEventListener("click",addFitness);
+  // 减脂：点击 + 图标 → 弹框录入
+  document.getElementById("fitAddBtn").addEventListener("click",addFitnessModal);
   document.getElementById("fitList").addEventListener("click",e=>{
     const ed=e.target.closest("[data-edit='fit']"); if(ed){editFitness(ed.dataset.id);return;}
     const d=e.target.closest("[data-del='fit']"); if(d){state.fitness=state.fitness.filter(z=>z.id!==d.dataset.id);save();refreshAll();}
@@ -929,20 +913,33 @@ function bindEvents(){
   document.getElementById("mask").addEventListener("click",e=>{if(e.target.id==="mask")closeModal();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
 }
-function fillCatOptions(type){
-  const arr=type==="income"?CAT_INCOME:CAT_EXPENSE;
-  document.getElementById("accCat").innerHTML=arr.map(c=>`<option value="${c[0]}">${c[0]}</option>`).join("");
-}
-function addAccount(){
-  const type=document.querySelector("#accType button.on").dataset.v;
-  const amount=parseFloat(document.getElementById("accAmount").value);
-  const cat=document.getElementById("accCat").value;
-  const date=document.getElementById("accDate").value||todayStr();
-  const note=document.getElementById("accNote").value.trim();
-  if(!(amount>0)){alert("请输入有效金额");return;}
-  state.accounts.push({id:uid(),type,amount,cat,date,note});
-  save();refreshAll();
-  document.getElementById("accAmount").value="";document.getElementById("accNote").value="";
+function addAccountModal(){
+  document.getElementById("modalBox").innerHTML=`
+    <div class="modal-h"><h3>➕ 记一笔</h3><button class="modal-x" id="mAAddClose" aria-label="关闭">关闭</button></div>
+    <div class="seg" id="mAAddType">
+      <button class="on" data-v="expense">支出</button>
+      <button data-v="income">收入</button>
+    </div>
+    <div class="row" style="margin-top:11px;">
+      <div class="field"><label>金额 (¥)</label><input type="number" id="mAAddAmount" placeholder="0.00" min="0" step="0.01"></div>
+      <div class="field"><label>分类</label><select id="mAAddCat"></select></div>
+    </div>
+    <div class="field"><label>日期</label><input type="date" id="mAAddDate" value="${todayStr()}"></div>
+    <div class="field"><label>备注</label><input type="text" id="mAAddNote" placeholder="选填"></div>
+    <button class="btn-primary" id="mAAddSave">保存记录</button>`;
+  let type="expense";
+  const fill=()=>{const arr=type==="income"?CAT_INCOME:CAT_EXPENSE;document.getElementById("mAAddCat").innerHTML=arr.map(c=>`<option value="${c[0]}">${c[0]}</option>`).join("");};
+  document.querySelectorAll("#mAAddType button").forEach(b=>b.addEventListener("click",()=>{type=b.dataset.v;document.querySelectorAll("#mAAddType button").forEach(x=>x.classList.toggle("on",x===b));fill();}));
+  fill();
+  document.getElementById("mAAddClose").addEventListener("click",closeModal);
+  document.getElementById("mAAddSave").addEventListener("click",()=>{
+    const amount=parseFloat(document.getElementById("mAAddAmount").value);
+    if(!(amount>0)){alert("请输入有效金额");return;}
+    state.accounts.push({id:uid(),type,amount,cat:document.getElementById("mAAddCat").value,date:document.getElementById("mAAddDate").value||todayStr(),note:document.getElementById("mAAddNote").value.trim()});
+    save();refreshAll();closeModal();
+  });
+  openModal();
+  setTimeout(()=>{const el=document.getElementById("mAAddAmount");if(el)el.focus();},50);
 }
 function editBudget(){
   document.getElementById("modalBox").innerHTML=`
@@ -956,27 +953,52 @@ function editBudget(){
   });
   openModal();
 }
-function addTodo(){
-  const title=document.getElementById("todoTitle").value.trim();
-  const date=document.getElementById("todoDate").value||todayStr();
-  const priority=document.getElementById("todoPri").value;
-  if(!title){alert("请输入待办事项");return;}
-  state.todos.push({id:uid(),title,date,priority,done:false});
-  save();refreshAll();
-  document.getElementById("todoTitle").value="";
+function addTodoModal(){
+  document.getElementById("modalBox").innerHTML=`
+    <div class="modal-h"><h3>🎯 添加待办</h3><button class="modal-x" id="mTdClose" aria-label="关闭">关闭</button></div>
+    <div class="field"><label>事项</label><input type="text" id="mTdTitle" placeholder="今天要做什么？"></div>
+    <div class="row">
+      <div class="field"><label>日期</label><input type="date" id="mTdDate" value="${todayStr()}"></div>
+      <div class="field"><label>优先级</label>
+        <select id="mTdPri"><option value="P0">P0 紧急</option><option value="P1" selected>P1 重要</option><option value="P2">P2 普通</option></select>
+      </div>
+    </div>
+    <button class="btn-primary" id="mTdSave">添加待办</button>`;
+  document.getElementById("mTdClose").addEventListener("click",closeModal);
+  document.getElementById("mTdSave").addEventListener("click",()=>{
+    const title=document.getElementById("mTdTitle").value.trim();
+    if(!title){alert("请输入待办事项");return;}
+    state.todos.push({id:uid(),title,date:document.getElementById("mTdDate").value||todayStr(),priority:document.getElementById("mTdPri").value,done:false});
+    save();refreshAll();closeModal();
+  });
+  openModal();
+  setTimeout(()=>{const el=document.getElementById("mTdTitle");if(el)el.focus();},50);
 }
-function addFitness(){
-  const weight=parseFloat(document.getElementById("fitWeight").value);
-  const fatRaw=document.getElementById("fitFat").value;
-  const fat=fatRaw===""?null:parseFloat(fatRaw);
-  const date=document.getElementById("fitDate").value||todayStr();
-  const note=document.getElementById("fitNote").value.trim();
-  if(!(weight>0)){alert("请输入体重");return;}
-  const exist=state.fitness.find(f=>f.date===date);
-  if(exist){exist.weight=weight;exist.fat=fat;exist.note=note;}
-  else state.fitness.push({id:uid(),date,weight,fat,note});
-  save();refreshAll();
-  document.getElementById("fitWeight").value="";document.getElementById("fitFat").value="";document.getElementById("fitNote").value="";
+function addFitnessModal(){
+  document.getElementById("modalBox").innerHTML=`
+    <div class="modal-h"><h3>⚖️ 记录体重</h3><button class="modal-x" id="mFitClose" aria-label="关闭">关闭</button></div>
+    <div class="row">
+      <div class="field"><label>体重 (kg)</label><input type="number" id="mFitW" placeholder="60.0" min="0" step="0.1"></div>
+      <div class="field"><label>体脂 (%)</label><input type="number" id="mFitF" placeholder="选填" min="0" step="0.1"></div>
+    </div>
+    <div class="field"><label>日期</label><input type="date" id="mFitD" value="${todayStr()}"></div>
+    <div class="field"><label>运动 / 备注</label><input type="text" id="mFitN" placeholder="如：跑步5km / 力量训练"></div>
+    <button class="btn-primary" id="mFitSave">保存记录</button>`;
+  document.getElementById("mFitClose").addEventListener("click",closeModal);
+  document.getElementById("mFitSave").addEventListener("click",()=>{
+    const weight=parseFloat(document.getElementById("mFitW").value);
+    if(!(weight>0)){alert("请输入体重");return;}
+    const fr=document.getElementById("mFitF").value;
+    const fat=fr===""?null:parseFloat(fr);
+    const date=document.getElementById("mFitD").value||todayStr();
+    const note=document.getElementById("mFitN").value.trim();
+    const exist=state.fitness.find(f=>f.date===date);
+    if(exist){exist.weight=weight;exist.fat=fat;exist.note=note;}
+    else state.fitness.push({id:uid(),date,weight,fat,note});
+    save();refreshAll();closeModal();
+  });
+  openModal();
+  setTimeout(()=>{const el=document.getElementById("mFitW");if(el)el.focus();},50);
 }
 function editTodo(id){
   const x=state.todos.find(z=>z.id===id);if(!x)return;

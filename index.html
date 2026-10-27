@@ -118,7 +118,7 @@
   .fold-head:active{background:rgba(var(--acc-rgb),.13);}
   .fold-head .fh-chev{flex:0 0 auto;width:14px;text-align:center;font-size:10px;color:var(--sub);}
   .fold-head .fh-t{font-weight:700;font-size:13.5px;color:var(--ink);}
-  .fold-head.day .fh-t{font-weight:600;font-size:12.5px;color:var(--sub);}
+  .fold-head.fday .fh-t{font-weight:600;font-size:12.5px;color:var(--sub);}
   .fold-head .fh-s{margin-left:auto;font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap;}
   .item{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;}
   .item .chk{width:22px;height:22px;border-radius:7px;border:2px solid #D8D8DE;flex:0 0 auto;cursor:pointer;display:flex;align-items:center;justify-content:center;}
@@ -935,7 +935,7 @@ function renderAccGroupedList(list){
     gm.days.sort((a,b)=>a.key<b.key?1:-1).forEach(dg=>{
       const dFolded=!!accFold.days[dg.key];
       const wd=WEEK_CN[weekday(+dg.key.slice(0,4),+dg.key.slice(5,7),+dg.key.slice(8,10))];
-      html+=`<div class="fold-head day" data-foldd="${dg.key}" role="button" tabindex="0" aria-expanded="${!dFolded}">
+      html+=`<div class="fold-head fday" data-foldd="${dg.key}" role="button" tabindex="0" aria-expanded="${!dFolded}">
         <span class="fh-chev">${dFolded?"▸":"▾"}</span>
         <span class="fh-t">${+dg.key.slice(5,7)}月${+dg.key.slice(8,10)}日 ${wd}</span>
         <span class="fh-s">${dg.items.length}笔${sumTxt(dg.income,dg.expense)?" · "+sumTxt(dg.income,dg.expense):""}</span>
